@@ -32,7 +32,7 @@ def write_utf8(fd, data):
         try:
             written = os.write(fd, msg)
             msg = msg[written:]
-        except OSError,e:
+        except OSError as e:
           if e.errno != EINTR:
               raise
     return msg
@@ -45,7 +45,7 @@ def read_utf8(fd, length):
             buf = os.read(fd, length)
             length -= len(buf)
             msg += buf
-        except OSError,e:
+        except OSError as e:
           if e.errno != EINTR:
               raise
     return msg.decode('utf-8')
