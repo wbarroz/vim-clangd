@@ -69,7 +69,7 @@ Sometimes completion is slow. there is a way to turn it off.
 
 Put this in your vimrc file
 ```
-let g:clangd#popup_auto = 0
+let g:clangd#completions_enabled = 0
 ```
 
 ### Specify python version
@@ -82,3 +82,18 @@ you might want to specify python version forcely
 let g:clangd#py_version = 2
 ```
 this will force vim-clangd to use python2
+
+### Use along with neocomplete
+
+make sure you have neocomplete installed. you should disable vim-clangd's
+autocompletion and configure neocomplete correctly. below is an example:
+
+```
+let g:clangd#completions_enabled = 0
+if !exists('g:neocomplete#force_omni_input_patterns')
+    let g:neocomplete#force_omni_input_patterns = {}
+endif
+let g:neocomplete#force_omni_input_patterns.c = '[^.[:digit:] *\t]\%(\.\|->\)\w*'
+let g:neocomplete#force_omni_input_patterns.cpp = '[^.[:digit:] *\t]\%(\.\|->\)\w*\|\h\w*::\w*'
+autocmd FileType c,cpp,objc,objcpp setlocal omnifunc=clangd#OmniCompleteAt
+```

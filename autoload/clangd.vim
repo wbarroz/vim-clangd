@@ -122,8 +122,8 @@ fu! s:SetUpFirstRun()
             let g:clangd#clangd_executable = 'clangd'
        endif
     endif
-    if !exists('g:clangd#popup_auto')
-       let g:clangd#popup_auto = 1
+    if !exists('g:clangd#completions_enabled')
+       let g:clangd#completions_enabled = 1
     endif
     if !exists('g:clangd#autostart')
        let g:clangd#autostart = 1
@@ -350,14 +350,14 @@ fu! s:InvokeCompletion()
 endf
 
 fu! s:SetCompletionCallback()
-  if !g:clangd#popup_auto
+  if !g:clangd#completions_enabled
     return
   endif
   set completeopt-=menu
   set completeopt+=menuone
   set completeopt-=longest
   let &l:completefunc = 'clangd#CodeCompleteAt'
-  " let &l:omnifunc = 'clangd#OmniCompleteAt'
+  setlocal omnifunc=clangd#OmniCompleteAt
 endf
 
 fu! s:GotoDefinition()
