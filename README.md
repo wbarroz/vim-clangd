@@ -3,7 +3,7 @@
 
 ## Demo
 
-![gif](http://i.imgur.com/VY1x43j.gif)
+![gif](http://i.imgur.com/I9cO6Ve.gif)
 
 ## Features
 
