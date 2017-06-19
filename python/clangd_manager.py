@@ -86,7 +86,6 @@ def CompletionItemKind(kind):
 class ClangdManager():
     def __init__(self):
         self.lined_diagnostics = {}
-        self.last_completions = self._GetEmptyCompletions()
         self.state = {}
         self._client = None
         self._in_shutdown = False
@@ -94,6 +93,17 @@ class ClangdManager():
         autostart = bool(vim.eval('g:clangd#autostart'))
         if autostart:
             self.startServer(confirmed=True)
+        self._ClearLastCompletions()
+
+    def _ClearLastCompletions(self):
+        self._last_completions = self._GetEmptyCompletions()
+        self._last_completions_pos = (-1, -1)
+
+    def _GetEmptyCompletions(self):
+        completions_tries = {}
+        for kind in GetCompletionItemKinds():
+            completions_tries[kind] = Trie()
+        return completions_tries
 
     def isAlive(self):
         return self._client and self._client.isAlive()
@@ -391,12 +401,6 @@ class ClangdManager():
             start_column -= 1
         return start_column, line[start_column:column]
 
-    def _GetEmptyCompletions(self):
-        completions_tries = {}
-        for kind in GetCompletionItemKinds():
-            completions_tries[kind] = Trie()
-        return completions_tries
-
     def _CodeCompleteAt(self, line, column):
         tries = self._GetEmptyCompletions()
 
@@ -446,28 +450,32 @@ class ClangdManager():
                                                          1] == ';':
             return -1
 
-        # cachable and timeoutable
-        try:
-            tries = self._CodeCompleteAt(line, column)
-        except OSError:
-            log.exception('failed to clang codecomplete at %d:%d' % (line,
-                                                                     column))
-            # use last completions if failed
-            tries = self.last_completions
+        # cachable
+        tries = self._last_completions
+
+        if not self._last_completions_pos == (line, start_column):
+            try:
+                # timeoutable
+                tries = self._CodeCompleteAt(line, column)
+                # update cache
+                self._last_completions = tries
+                self._last_completions_pos = (line, start_column)
+            except OSError:
+                log.exception('failed to clang codecomplete at %d:%d' %
+                              (line, column))
 
         flat_completions = []
         for kind, trie in tries.items():
             flat_completions.extend(trie.searchPrefix(start_word)[0:10])
 
-        self.last_completions = tries
-        self.completions_words = flat_completions
+        self._computed_completions_words = flat_completions
         return start_column + 1
 
     def GetCompletions(self):
-        if len(self.last_completions) == 0:
+        if len(self._last_completions) == 0:
             return {'words': [], 'refresh': 'always'}
         _, column = vimsupport.CurrentLineAndColumn()
-        words = self.completions_words
+        words = self._computed_completions_words
         return {'words': words, 'refresh': 'always'}
 
     def GotoDefinition(self):
