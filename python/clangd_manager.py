@@ -445,9 +445,12 @@ class ClangdManager():
         start_column, start_word = self._CalculateStartColumnAt(
             column, vimsupport.CurrentLine())
 
-        # skip from ';'
-        if start_word == '' and vimsupport.CurrentLine()[start_column -
-                                                         1] == ';':
+        trigger_word = None
+        if start_column:
+            trigger_word = vimsupport.CurrentLine()[start_column - 1];
+
+        # skip from ';' and '}'
+        if trigger_word == ';' or trigger_word == '}':
             return -1
 
         # cachable
