@@ -3,6 +3,7 @@
 import vimsupport, vim
 from signal import signal, SIGINT, SIG_IGN
 from lsp_client import LSPClient
+from trie import Trie
 
 import glog as log
 import os
@@ -18,22 +19,28 @@ def GetFilePathFromUri(uri):
     return uri[7:]
 
 
+# m,f,c,v,t
+# ordered
+def GetCompletionItemKinds():
+    return ['m', 'f', 'c', 'v', 't', 'k']
+
+
 def CompletionItemKind(kind):
     ##export const Text = 1;
     if kind == 1:
-        return 't'
+        return 'm'
 ##export const Method = 2;
     elif kind == 2:
-        return 'm'
+        return 'f'
 ##export const Function = 3;
     elif kind == 3:
         return 'f'
 ##export const Constructor = 4;
     elif kind == 4:
-        return 'c'
+        return 'f'
 ##export const Field = 5;
     elif kind == 5:
-        return 'f'
+        return 'v'
 ##export const Variable = 6;
     elif kind == 6:
         return 'v'
@@ -42,37 +49,38 @@ def CompletionItemKind(kind):
         return 'c'
 ##export const Interface = 8;
     elif kind == 8:
-        return 'i'
+        return 'c'
 ##export const Module = 9;
     elif kind == 9:
         return 'm'
 ##export const Property = 10;
     elif kind == 10:
-        return 'p'
+        return 'v'
 ##export const Unit = 11;
     elif kind == 11:
-        return 'u'
+        return 't'
 ##export const Value = 12;
     elif kind == 12:
         return 'v'
 ##export const Enum = 13;
     elif kind == 13:
-        return 'e'
+        return 'c'
 ##export const Keyword = 14;
     elif kind == 14:
         return 'k'
 ##export const Snippet = 15;
     elif kind == 15:
-        return 's'
+        return 'k'
 ##export const Color = 16;
     elif kind == 16:
-        return 'c'
+        return 'k'
 ##export const File = 17;
     elif kind == 17:
-        return 'f'
+        return 'k'
+
 ##export const Reference = 18;
     elif kind == 18:
-        return 'f'
+        return 't'
     return ''
 
 
@@ -80,7 +88,7 @@ class ClangdManager():
     def __init__(self):
         signal(SIGINT, SIG_IGN)
         self.lined_diagnostics = {}
-        self.last_completions = {}
+        self.last_completions = self._GetEmptyCompletions()
         self.state = {}
         self._client = None
         self._in_shutdown = False
@@ -104,7 +112,8 @@ class ClangdManager():
             clangd_log_path = os.path.expanduser(
                 vim.eval('g:clangd#log_path') + '/clangd.log')
             try:
-                self._client = LSPClient(clangd_executable, clangd_log_path, self)
+                self._client = LSPClient(clangd_executable, clangd_log_path,
+                                         self)
             except:
                 log.exception('failed to start clangd')
                 vimsupport.EchoMessage('failed to start clangd executable')
@@ -375,70 +384,93 @@ class ClangdManager():
             log.exception('failed to update curent buffer')
             vimsupport.EchoTruncatedText('unable to update curent buffer')
 
-
-    def CalculateStartColumn(self):
-        current_line = vimsupport.CurrentLine()
-        _, column = vimsupport.CurrentLineAndColumn()
-        start_column = min(column, len(current_line))
+    def _CalculateStartColumnAt(self, column, line):
+        start_column = min(column, len(line))
         while start_column:
-            c = current_line[start_column - 1]
+            c = line[start_column - 1]
             if not (str.isalnum(c) or c == '_'):
                 break
             start_column -= 1
-        return start_column, current_line[start_column:column]
+        return start_column, line[start_column:column]
 
-    def CodeCompleteAtCurrent(self):
-        if not self.isAlive():
-            return -2
-        if not self.OpenCurrentFile():
-            return -2
+    def _GetEmptyCompletions(self):
+        completions_tries = {}
+        for kind in GetCompletionItemKinds():
+            completions_tries[kind] = Trie()
+        return completions_tries
 
-        line, column = vimsupport.CurrentLineAndColumn()
-        log.debug('code complete at %d:%d' % (line, column))
-        self.last_completions = {}
-        start_column, word = self.CalculateStartColumn()
+    def _CodeCompleteAt(self, line, column):
+        tries = self._GetEmptyCompletions()
+
         uri = GetUriFromFilePath(vimsupport.CurrentBufferFileName())
         try:
             completions = self._client.completeAt(uri, line - 1, column - 1)
         except:
-            log.exception('failed to code complete at %d:%d' % (line, column))
-            return -2
-        words = []
-        total_cnt = len(completions)
-        if word == '':
-            completions = sorted(
-                completions, key=lambda completion: completion['kind'] if 'kind' in completion else 1)
-            completions = completions[0:20]
-        else:
-            log.info('start column %d, start prefix %s' % (start_column, word))
-            completions = list(
-                filter(lambda completion: completion['label'].startswith(word),
-                       completions))
-        log.info('%d completions in total, reduced to %d' % (total_cnt, len(completions)))
+            log.exception('failed to clang codecomplete at %d:%d' % (line,
+                                                                     column))
+            raise
+
+        log.info('performed clang codecomplete at %d:%d, result %d items' %
+                 (line, column, len(completions)))
+
         for completion in completions:
             if not 'kind' in completion:
-                completion['kind'] = 1
-            if not 'documentation' in completion:
-                completion['documentation'] = completion['label']
-            words.append({
-                'word': completion['label'], # The actual completion
-                'kind': CompletionItemKind(completion['kind']), # The type of completion, one character
-                'info': completion['documentation'],  #document
-                'icase': 1, # ignore case
-                'dup': 1 # allow duplicates
+                continue
+            kind = CompletionItemKind(completion['kind'])
+            # actual results to feed vim
+            tries[kind].insert(completion['insertText'], {
+                'word':  # The actual completion
+                completion['insertText'],
+                'kind': # The type of completion, one character
+                kind,
+                'info':
+                completion['detail'] if 'detail' in completion
+                else completion['label'],  #document
+                'icase':
+                1,  # ignore case
+                'dup':
+                1  # allow duplicates
             })
-        self.last_completions = words
+        return tries
+
+    def CodeCompleteAtCurrent(self):
+        if not self.isAlive():
+            return -1
+        if not self.OpenCurrentFile():
+            return -1
+
+        line, column = vimsupport.CurrentLineAndColumn()
+        start_column, start_word = self._CalculateStartColumnAt(
+            column, vimsupport.CurrentLine())
+
+        # skip from ';'
+        if start_word == '' and vimsupport.CurrentLine()[start_column -
+                                                         1] == ';':
+            return -1
+
+        # cachable and timeoutable
+        try:
+            tries = self._CodeCompleteAt(line, column)
+        except OSError:
+            log.exception('failed to clang codecomplete at %d:%d' % (line,
+                                                                     column))
+            # use last completions if failed
+            tries = self.last_completions
+
+        flat_completions = []
+        for kind, trie in tries.items():
+            flat_completions.extend(trie.searchPrefix(start_word)[0:10])
+
+        self.last_completions = tries
+        self.completions_words = flat_completions
         return start_column + 1
 
     def GetCompletions(self):
         if len(self.last_completions) == 0:
             return {'words': [], 'refresh': 'always'}
         _, column = vimsupport.CurrentLineAndColumn()
-        words = self.last_completions
-        size = len(words)
-        if size > 20:
-            size = 20
-        return {'words': words[0:size], 'refresh': 'always'}
+        words = self.completions_words
+        return {'words': words, 'refresh': 'always'}
 
     def GotoDefinition(self):
         if not self.isAlive():
@@ -489,5 +521,5 @@ class ClangdManager():
         try:
             for uri in list(self._documents.keys()):
                 self._client.didCloseTestDocument(uri)
-        except:
+        except OSError:
             log.exception('failed to close all files')
