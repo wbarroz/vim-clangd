@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import vimsupport, vim
-from signal import signal, SIGINT, SIG_IGN
 from lsp_client import LSPClient
 from trie import Trie
 
@@ -86,7 +85,6 @@ def CompletionItemKind(kind):
 
 class ClangdManager():
     def __init__(self):
-        signal(SIGINT, SIG_IGN)
         self.lined_diagnostics = {}
         self.last_completions = self._GetEmptyCompletions()
         self.state = {}

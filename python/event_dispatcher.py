@@ -97,12 +97,10 @@ class EventDispatcher:
     def OnCursorMove(self):
         if self._timer:
             self._timer.poll()
-        log.debug('CursorMove')
 
     def OnCursorHold(self):
         if self._timer:
             self._timer.poll()
-        log.debug('CursorHold')
 
     def OnInsertEnter(self):
         if self._timer:

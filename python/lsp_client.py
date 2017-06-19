@@ -2,7 +2,6 @@
 # https://github.com/Microsoft/language-server-protocol/blob/master/protocol.md
 from jsonrpc import JsonRPCClient
 from subprocess import check_output, CalledProcessError, Popen
-from signal import signal, SIGCHLD, SIG_IGN
 import glog as log
 import os
 
@@ -43,26 +42,8 @@ class LSPClient():
         self._rpcclient = JsonRPCClient(self, fdRead, fdWrite)
         self._is_alive = True
         self._manager = manager
-        self.RegisterSignalHandler()
-
-    def RegisterSignalHandler(self):
-        signal(SIGCHLD, lambda signal, frname: self.OnSigChld())
-
-    def DeregisterSignalHandler(self):
-        signal(SIGCHLD, SIG_IGN)
-
-    def OnSigChld(self):
-        if not self._is_alive:
-            return
-        # we have lots child processes to spawn and exit with vim
-        # it is saving our live to detect clangd process here
-        try:
-            os.kill(self._clangd.pid, 0)
-        except OSError:
-            self.onServerDown()
 
     def CleanUp(self):
-        self.DeregisterSignalHandler()
         if self._clangd.poll() == None:
             self._clangd.terminate()
         if self._clangd.poll() == None:
@@ -88,6 +69,7 @@ class LSPClient():
 
     def onServerDown(self):
         self._is_alive = False
+        self._client.stop()
         self._manager.on_server_down()
 
     def initialize(self):
