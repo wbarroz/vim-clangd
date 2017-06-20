@@ -419,20 +419,22 @@ class ClangdManager():
             if not 'kind' in completion:
                 continue
             kind = CompletionItemKind(completion['kind'])
+            # insertText is missing from old clangd, we try to keep compatibility here
+            word = completion['insertText'] if 'insertText' in completion else completion['label']
+            # description
+            info = completion['detail'] if 'detail' in completion else completion['label']
             # actual results to feed vim
-            tries[kind].insert(completion['insertText'], {
-                'word':  # The actual completion
-                completion['insertText'],
-                'kind': # The type of completion, one character
-                kind,
-                'info':
-                completion['detail'] if 'detail' in completion
-                else completion['label'],  #document
-                'icase':
-                1,  # ignore case
-                'dup':
-                1  # allow duplicates
-            })
+            tries[kind].insert(
+                word,
+                {
+                    'word':  # The actual completion
+                    word,
+                    'kind':  # The type of completion, one character
+                    kind,
+                    'info': info,  # description
+                    'icase': 1,  # ignore case
+                    'dup': 1  # allow duplicates
+                })
         return tries
 
     def CodeCompleteAtCurrent(self):
@@ -447,7 +449,7 @@ class ClangdManager():
 
         trigger_word = None
         if start_column:
-            trigger_word = vimsupport.CurrentLine()[start_column - 1];
+            trigger_word = vimsupport.CurrentLine()[start_column - 1]
 
         # skip from ';' and '}'
         if trigger_word == ';' or trigger_word == '}':
