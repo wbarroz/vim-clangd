@@ -64,6 +64,8 @@ you can write clangd's path in vimrc file such as
 let g:clangd#clangd_executable = '~/build-llvm/bin/clangd'
 ```
 
+make sure you have clang headers in the right directory
+
 ### Turn off auto completion
 Sometimes completion is slow. there is a way to turn it off.
 

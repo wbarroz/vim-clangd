@@ -12,17 +12,26 @@ fetch_src() {
         git clone --depth=1 https://github.com/llvm-mirror/llvm llvm-src
     else
         echo 'Use existing llvm-src'
+        pushd llvm-src
+        git pull --rebase
+        popd
     fi
     if [ ! -d llvm-src/tools/clang ]; then
         git clone --depth=1 https://github.com/llvm-mirror/clang llvm-src/tools/clang
     else
         echo 'Use existing llvm-src/tools/clang'
+        pushd llvm-src/tools/clang
+        git pull --rebase
+        popd
     fi
 
     if [ ! -d llvm-src/tools/clang/tools/extra ]; then
         git clone --depth=1 https://github.com/llvm-mirror/clang-tools-extra llvm-src/tools/clang/tools/extra
     else
         echo 'Use existing llvm-src/tools/clang/tools/extra'
+        pushd llvm-src/tools/clang/tools/extra
+        git pull --rebase
+        popd
     fi
 }
 
@@ -86,13 +95,15 @@ build_clangd() {
         -DCMAKE_C_COMPILER=$CC \
         -DCMAKE_CXX_COMPILER=$CXX \
         ../llvm-src
-    ninja clangd
+    ninja clangd tools/clang/lib/Headers/clang-headers
     popd
 }
 
 post_build() {
-    cp build-llvm/bin/clangd clangd
-    echo "clangd is built at $PWD/clangd"
+    mkdir -p bin lib/clang/5.0.0
+    cp -f {build-llvm/,}bin/clangd
+    cp -rf build-llvm/lib/clang/5.0.0/include lib/clang/5.0.0/
+    echo "clangd is built at $PWD/bin/clangd"
 }
 
 fetch_src

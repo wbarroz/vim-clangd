@@ -2,3 +2,5 @@ llvm-src
 build-llvm
 # built executable
 clangd
+bin
+lib

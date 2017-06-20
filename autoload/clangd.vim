@@ -115,7 +115,7 @@ endf
 
 fu! s:SetUpFirstRun()
     if !exists('g:clangd#clangd_executable')
-       let clangd_path = s:script_folder_path . '/../script/clangd'
+       let clangd_path = s:script_folder_path . '/../script/bin/clangd'
        if filereadable(clangd_path)
             let g:clangd#clangd_executable = clangd_path
        else
