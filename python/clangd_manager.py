@@ -420,9 +420,12 @@ class ClangdManager():
                 continue
             kind = CompletionItemKind(completion['kind'])
             # insertText is missing from old clangd, we try to keep compatibility here
-            word = completion['insertText'] if 'insertText' in completion else completion['label']
+            word = completion[
+                'insertText'] if 'insertText' in completion else completion[
+                    'label']
             # description
-            info = completion['detail'] if 'detail' in completion else completion['label']
+            info = completion[
+                'detail'] if 'detail' in completion else completion['label']
             # actual results to feed vim
             tries[kind].insert(
                 word,
@@ -534,3 +537,76 @@ class ClangdManager():
                 self._client.didCloseTestDocument(uri)
         except OSError:
             log.exception('failed to close all files')
+
+    def _UpdateBufferByTextEdits(self, buf, textedits):
+        text = vimsupport.ExtractUTF8Text(buf)
+        l = 0
+        c = 0
+        n = 0
+        for textedit in textedits:
+            start_line = textedit['range']['start']['line']
+            start_column = textedit['range']['start']['character']
+            end_line = textedit['range']['end']['line']
+            end_column = textedit['range']['end']['character']
+            while not (l == start_line and c == start_column):
+                if n + 1 >= len(text):
+                    break
+                n += 1
+                if text[n - 1] == u'\n':
+                    l += 1
+                    c = 0
+                else:
+                    c += 1
+            # unexcepted result
+            if n + 1 >= len(text):
+                break
+            bn = n
+            while not (l == end_line and c == end_column):
+                if n + 1 >= len(text):
+                    n += 1
+                    break
+                n += 1
+                if text[n - 1] == u'\n':
+                    l += 1
+                    c = 0
+                else:
+                    c += 1
+            nn = bn + len(textedit['newText'])
+            text = text[0:bn] + textedit['newText'] + text[n:]
+            n = nn
+        vim.current.buffer[:] = text.split('\n')
+
+    def format(self):
+        buf = vim.current.buffer
+        if buf.mark('<') is None or buf.mark('<') is None:
+            self._FormatBuffer(buf)
+        else:
+            self._FormatOnRange(buf, buf.mark('<'), buf.mark('>'))
+
+    def _FormatBuffer(self, buf):
+        uri = GetUriFromFilePath(buf.name)
+
+        # synchronize before format
+        self.didChangeFile(buf)
+
+        # actual format rpc
+        textedits = self._client.format(uri)
+        self._UpdateBufferByTextEdits(buf, textedits)
+
+    def _FormatOnRange(self, buf, start, end):
+        (start_line, start_column) = start
+        start_column = min(
+            len(buf[start_line - 1]) - 1
+            if len(buf[start_line - 1]) > 0 else 0, start_column)
+        (end_line, end_column) = end
+        end_column = min(
+            len(buf[end_line - 1]) - 1
+            if len(buf[end_line - 1]) > 0 else 0, end_column)
+        uri = GetUriFromFilePath(vimsupport.CurrentBufferFileName())
+        # synchronize before format
+        self.didChangeFile(buf)
+
+        # actual format rpc
+        textedits = self._client.rangeFormat(uri, start_line - 1, start_column,
+                                             end_line - 1, end_column)
+        self._UpdateBufferByTextEdits(buf, textedits)

@@ -400,6 +400,11 @@ fu! s:RestartServer()
   Python manager.startServer(confirmed = True)
 endf
 
+fu! s:Format()
+  " Determine range or format current buffer
+  Python manager.format()
+endf
+
 fu! s:PyEval(line)
     if s:python_version == 3
         return py3eval(a:line)
@@ -425,5 +430,6 @@ command! ClangdForceCompile call s:ForceCompile()
 command! ClangdStartServer call s:StartServer()
 command! ClangdStopServer call s:StopServer()
 command! ClangdRestartServer call s:RestartServer()
+command! ClangdFormat call s:Format()
 
 call s:restore_cpo()

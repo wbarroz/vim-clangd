@@ -9,7 +9,7 @@
 
 |C/C++ Editor feature                |Clangd    |vim-clangd|
 |------------------------------------|----------|----------|
-|Formatting                          |Yes       |No        |
+|Formatting                          |Yes       |Yes       |
 |Completion                          |Yes       |Yes       |
 |Diagnostics                         |Yes       |Yes       |
 |Fix-its                             |Yes       |No        |
@@ -58,8 +58,8 @@ see more at [clang docs](https://clang.llvm.org/get_started.html) but "extra Cla
 ## Advanced Usage
 
 ### Specify other clangd instance
-if you have many clangd instances and want to specify one,
-you can write clangd's path in vimrc file such as
+if you have clangd not in the path
+you can specify clangd binary in vimrc file such as
 ```
 let g:clangd#clangd_executable = '~/build-llvm/bin/clangd'
 ```
@@ -72,6 +72,17 @@ Sometimes completion is slow. there is a way to turn it off.
 Put this in your vimrc file
 ```
 let g:clangd#completions_enabled = 0
+```
+
+### Code format the selected code
+
+you can use `:<C-u> ClangdFormat` to code format the specified code
+
+and you can specify shortcuts for it, such as
+
+```
+au FileType c,cpp,objc,objcpp nnoremap <buffer><Leader>cf :ClangdFormat<CR>
+au FileType c,cpp,objc,objcpp vnoremap <buffer><Leader>cf :<C-u>ClangdFormat<CR>
 ```
 
 ### Specify python version

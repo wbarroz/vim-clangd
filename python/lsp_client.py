@@ -10,6 +10,9 @@ Shutdown_REQUEST = 'shutdown'
 Exit_NOTIFICATION = 'exit'
 
 Completion_REQUEST = 'textDocument/completion'
+Formatting_REQUEST = 'textDocument/formatting'
+RangeFormatting_REQUEST = 'textDocument/rangeFormatting'
+OnTypeFormatting_REQUEST = 'textDocument/onTypeFormatting'
 
 Initialized_NOTIFICATION = 'initialized'
 DidOpenTextDocument_NOTIFICATION = 'textDocument/didOpen'
@@ -19,7 +22,8 @@ DidCloseTextDocument_NOTIFICATION = 'textDocument/didClose'
 
 PublishDiagnostics_NOTIFICATION = 'textDocument/publishDiagnostics'
 
-def StartProcess(name, clangd_log_path = None):
+
+def StartProcess(name, clangd_log_path=None):
     from os import pipe, devnull
     if not clangd_log_path or not log.logger.isEnabledFor(log.DEBUG):
         clangd_log_path = devnull
@@ -141,6 +145,42 @@ class LSPClient():
 
     def completeAt(self, uri, line, character):
         return self._rpcclient.sendRequest(Completion_REQUEST, {
+            'textDocument': {
+                'uri': uri,
+            },
+            'position': {
+                'line': line,
+                'character': character
+            }
+        })
+
+    def format(self, uri):
+        return self._rpcclient.sendRequest(Formatting_REQUEST,
+                                           {'textDocument': {
+                                               'uri': uri,
+                                           }})
+
+    def rangeFormat(self, uri, start_line, start_character, end_line,
+                    end_character):
+        return self._rpcclient.sendRequest(RangeFormatting_REQUEST, {
+            'textDocument': {
+                'uri': uri,
+            },
+            'range': {
+                'start': {
+                    'line': start_line,
+                    'character': start_character,
+                },
+                'end': {
+                    'line': end_line,
+                    'character': end_character,
+                },
+            }
+        })
+
+    def onTypeFormat(self, uri, line, character, ch=None):
+        # clangd don't use ch yet
+        return self._rpcclient.sendRequest(OnTypeFormatting_REQUEST, {
             'textDocument': {
                 'uri': uri,
             },
