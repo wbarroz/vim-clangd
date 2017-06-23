@@ -23,7 +23,7 @@ DidCloseTextDocument_NOTIFICATION = 'textDocument/didClose'
 PublishDiagnostics_NOTIFICATION = 'textDocument/publishDiagnostics'
 
 MAX_CLIENT_ERRORS = 100
-MAX_CLIENT_TIMEOUTS = 1000
+MAX_CLIENT_TIMEOUTS = 5000
 
 
 def StartProcess(name, clangd_log_path=None):
