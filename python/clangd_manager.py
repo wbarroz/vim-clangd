@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import vimsupport, vim
-from lsp_client import LSPClient
+from lsp_client import LSPClient, TimedOutError
 from trie import Trie
 
 import glog as log
@@ -132,10 +132,11 @@ class ClangdManager():
         if confirmed or vimsupport.PresentYesOrNoDialog(
                 'Should we stop clangd?'):
             try:
-                client = self._client
-                self._client = None
-                client.shutdown()
-                client.exit()
+                if self._client:
+                    client = self._client
+                    self._client = None
+                    client.shutdown()
+                    client.exit()
             except:
                 log.exception('failed to stop clangd')
                 return
@@ -159,7 +160,9 @@ class ClangdManager():
         vimsupport.UnplaceAllSigns()
 
         if not self._in_shutdown:
-            self.restartServer()
+            self.stopServer(confirmed=True)
+            if bool(vim.eval('g:clangd#restart_after_crash')):
+                self.startServer(confirmed=True)
 
     def on_bad_message_received(self, wc, message):
         log.info('observer: bad message')
@@ -251,6 +254,10 @@ class ClangdManager():
             return
         log.info('diagnostics for %s is updated' % uri)
         self._documents[uri]['diagnostics'] = diagnostics
+
+    def HandleClientRequests(self):
+        if self._client:
+            self._client.handleClientRequests()
 
     def GetDiagnostics(self, buf):
         if not self.isAlive():
@@ -401,16 +408,14 @@ class ClangdManager():
             start_column -= 1
         return start_column, line[start_column:column]
 
-    def _CodeCompleteAt(self, line, column):
+    def onCodeCompletions(self, uri, line, column, completions):
+        if uri not in self._documents:
+            return
+        if uri != GetUriFromFilePath(vimsupport.CurrentBufferFileName()):
+            return
+        if not self._last_completions_pos == (line, column):
+            return
         tries = self._GetEmptyCompletions()
-
-        uri = GetUriFromFilePath(vimsupport.CurrentBufferFileName())
-        try:
-            completions = self._client.completeAt(uri, line - 1, column - 1)
-        except:
-            log.exception('failed to clang codecomplete at %d:%d' % (line,
-                                                                     column))
-            raise
 
         log.info('performed clang codecomplete at %d:%d, result %d items' %
                  (line, column, len(completions)))
@@ -438,7 +443,8 @@ class ClangdManager():
                     'icase': 1,  # ignore case
                     'dup': 1  # allow duplicates
                 })
-        return tries
+        # update cache
+        self._last_completions = tries
 
     def CodeCompleteAtCurrent(self):
         if not self.isAlive():
@@ -458,19 +464,19 @@ class ClangdManager():
         if trigger_word == ';' or trigger_word == '}':
             return -1
 
-        # cachable
-        tries = self._last_completions
-
-        if not self._last_completions_pos == (line, start_column):
+        if not self._last_completions_pos == (line - 1, start_column):
+            timeout_ms = int(vim.eval('g:clangd#codecomplete_timeout'))
             try:
-                # timeoutable
-                tries = self._CodeCompleteAt(line, column)
-                # update cache
-                self._last_completions = tries
-                self._last_completions_pos = (line, start_column)
-            except OSError:
-                log.exception('failed to clang codecomplete at %d:%d' %
-                              (line, column))
+                self._last_completions_pos = (line - 1, start_column)
+                uri = GetUriFromFilePath(vimsupport.CurrentBufferFileName())
+                self._client.codeCompleteAt(
+                    uri, line - 1, start_column, timeout_ms=timeout_ms)
+            except TimedOutError:
+                log.warn('perform clang codecomplete timed out at %d:%d' %
+                         (line, column))
+
+        # fetch cachable completions
+        tries = self._last_completions
 
         flat_completions = []
         for kind, trie in tries.items():
@@ -586,11 +592,17 @@ class ClangdManager():
     def _FormatBuffer(self, buf):
         uri = GetUriFromFilePath(buf.name)
 
-        # synchronize before format
-        self.didChangeFile(buf)
+        try:
+            # synchronize before format
+            self.didChangeFile(buf)
 
-        # actual format rpc
-        textedits = self._client.format(uri)
+            # actual format rpc
+            textedits = self._client.format(uri)
+        except OSError as e:
+            vimsupport.EchoMessage("clangd refuse to perform code format")
+            log.info(e)
+            return
+
         self._UpdateBufferByTextEdits(buf, textedits)
 
     def _FormatOnRange(self, buf, start, end):
@@ -603,10 +615,16 @@ class ClangdManager():
             len(buf[end_line - 1]) - 1
             if len(buf[end_line - 1]) > 0 else 0, end_column)
         uri = GetUriFromFilePath(vimsupport.CurrentBufferFileName())
-        # synchronize before format
-        self.didChangeFile(buf)
+        try:
+            # synchronize before format
+            self.didChangeFile(buf)
 
-        # actual format rpc
-        textedits = self._client.rangeFormat(uri, start_line - 1, start_column,
-                                             end_line - 1, end_column)
+            # actual format rpc
+            textedits = self._client.rangeFormat(uri, start_line - 1, start_column,
+                                                 end_line - 1, end_column)
+        except OSError as e:
+            vimsupport.EchoMessage("clangd refuse to perform code format")
+            log.info(e)
+            return
+
         self._UpdateBufferByTextEdits(buf, textedits)

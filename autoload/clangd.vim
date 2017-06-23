@@ -141,6 +141,14 @@ fu! s:SetUpFirstRun()
           let g:clangd#py_version = 2
        endif
     endif
+    if !exists('g:clangd#restart_after_crash')
+       let g:clangd#restart_after_crash = 1
+    endif
+    if !exists('g:clangd#codecomplete_timeout')
+       let g:clangd#codecomplete_timeout = 100
+    endif
+
+    " Python Setup
     if g:clangd#py_version == 3
         let s:python_version = 3
         let cmd_exec = 'python3'

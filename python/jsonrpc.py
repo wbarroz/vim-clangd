@@ -1,5 +1,5 @@
 # simple jsonrpc client over raw socket
-# https://github.com/Microsoft/language-server-protocol/blob/master/protocol.md
+# http://www.jsonrpc.org/specification
 # Content-Length: ...\r\n
 # \r\n
 # {
@@ -16,9 +16,13 @@ import glog as log
 from threading import Thread
 from errno import EINTR
 from time import sleep
+from select import select
 import queue
-IDLE_INTERVAL=0.01
+DEFAULT_TIMEOUT_MS = 1000
+IDLE_INTERVAL_MS = 10
 
+class TimedOutError(OSError):
+    pass
 
 def EstimateUnreadBytes(fd):
     from array import array
@@ -27,6 +31,7 @@ def EstimateUnreadBytes(fd):
     buf = array('i', [0])
     ioctl(fd, FIONREAD, buf, 1)
     return buf[0]
+
 
 def write_utf8(fd, data):
     msg = data.encode('utf-8')
@@ -38,6 +43,7 @@ def write_utf8(fd, data):
             if e.errno != EINTR:
                 raise
     return msg
+
 
 def read_utf8(fd, length):
     msg = bytes()
@@ -51,6 +57,7 @@ def read_utf8(fd, length):
                 raise
     return msg.decode('utf-8')
 
+
 class JsonRPCClientThread(Thread):
     def __init__(self, input_fd, output_fd, read_queue, write_queue):
         Thread.__init__(self)
@@ -61,8 +68,9 @@ class JsonRPCClientThread(Thread):
         self._write_queue = write_queue
 
     def _SendMsg(self, r):
-        request = json.dumps(r, separators=(',',':'), sort_keys=True)
-        write_utf8(self._input_fd, u'Content-Length: %d\r\n\r\n' % len(request))
+        request = json.dumps(r, separators=(',', ':'), sort_keys=True)
+        write_utf8(self._input_fd,
+                   u'Content-Length: %d\r\n\r\n' % len(request))
         write_utf8(self._input_fd, request)
 
     def _RecvMsgHeader(self):
@@ -87,6 +95,10 @@ class JsonRPCClientThread(Thread):
         rr = json.loads(msg)
         return rr
 
+    def _OnWentWrong(self):
+        self._is_stop = True
+        self._read_queue.put(OSError('shutdown unexcepted'))
+
     def run(self):
         long_idle = 0
         while not self._is_stop:
@@ -96,7 +108,9 @@ class JsonRPCClientThread(Thread):
                 except queue.Empty:
                     break
 
-                if isinstance(r, Exception):
+                # receive shutdown notification
+                # FIXME use better class?
+                if isinstance(r, OSError):
                     self._is_stop = True
                     break
 
@@ -104,23 +118,31 @@ class JsonRPCClientThread(Thread):
                     self._SendMsg(r)
                     long_idle = 0
                 except OSError as e:
-                    self._read_queue.put(e)
-                    self._is_stop = True
+                    self._OnWentWrong()
                     break
             if self._is_stop:
                 break
-            while EstimateUnreadBytes(self._output_fd) > 0:
+            rlist, _, _ = select([self._output_fd], [], [],
+                                         IDLE_INTERVAL_MS * 0.0001 * long_idle)
+
+            # ticky to detect clangd's failure
+            if rlist and EstimateUnreadBytes(self._output_fd) == 0:
+                self._OnWentWrong()
+                break
+
+            if rlist:
+                long_idle = 0
+
+            if rlist and EstimateUnreadBytes(
+                    self._output_fd) > len('Content-Length: '):
                 try:
                     rr = self._RecvMsg()
-                    long_idle = 0
                 except OSError as e:
-                    self._read_queue.put(e)
-                    self._is_stop = True
+                    self._OnWentWrong()
                     break
                 self._read_queue.put(rr)
             if long_idle < 100:
                 long_idle += 1
-            sleep(IDLE_INTERVAL * long_idle)
         pass
 
 
@@ -131,24 +153,29 @@ class JsonRPCClient:
         self._observer = request_observer
         self._read_queue = queue.Queue()
         self._write_queue = queue.Queue()
-        self._io_thread = JsonRPCClientThread(input_fd, output_fd, self._read_queue, self._write_queue)
+        self._io_thread = JsonRPCClientThread(
+            input_fd, output_fd, self._read_queue, self._write_queue)
         self._io_thread.start()
         self._is_stop = False
 
     def stop(self):
         if self._is_stop:
             return
-        self._read_queue.put(OSError('stop'))
+        self._write_queue.put(OSError('stop'))
         self._is_stop = True
         self._io_thread.join()
 
-    def sendRequest(self, method, params={}, nullResponse=False):
+    def sendRequest(self, method, params, nullResponse, timeout_ms):
         Id = self._no
         self._no = self._no + 1
         r = self.SendMsg(method, params, Id=Id)
         if nullResponse:
             return None
-        while True:
+        log.debug('send request: %s' % r)
+
+        if timeout_ms is None:
+            timeout_ms = DEFAULT_TIMEOUT_MS
+        while timeout_ms > 0:
             if self._is_stop:
                 self._observer.onServerDown()
                 raise OSError('client is down')
@@ -156,19 +183,21 @@ class JsonRPCClient:
             try:
                 rr = self._read_queue.get_nowait()
             except queue.Empty:
-                sleep(IDLE_INTERVAL)
+                sleep(IDLE_INTERVAL_MS * 0.0001)
+                timeout_ms -= IDLE_INTERVAL_MS
                 continue
-            if isinstance(rr, Exception):
+            if isinstance(rr, OSError):
                 self._observer.onServerDown()
                 raise rr
             rr = self.RecvMsg(rr)
             if 'id' in rr and rr['id'] == Id:
                 if 'error' in rr:
-                    raise Exception('bad error_code %d' % rr['error'])
+                    raise OSError('bad error_code %d' % rr['error'])
                 return rr['result']
+        raise TimedOutError('msg timeout')
         return None
 
-    def sendNotification(self, method, params={}):
+    def sendNotification(self, method, params):
         try:
             r = self.SendMsg(method, params)
         except OSError:
@@ -184,7 +213,7 @@ class JsonRPCClient:
                 rr = self._read_queue.get_nowait()
             except queue.Empty:
                 break
-            if isinstance(rr, Exception):
+            if isinstance(rr, OSError):
                 raise rr
             self.RecvMsg(rr)
 
