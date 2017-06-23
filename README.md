@@ -74,6 +74,24 @@ Put this in your vimrc file
 let g:clangd#completions_enabled = 0
 ```
 
+### Tune auto completion speed
+Sometimes completion is slow. vim-clangd will detect the slow code completion and skip to let you go.
+the condition is tunable where default is 100ms.
+
+Put this in your vimrc file to save your waiting time to 10ms
+```
+let g:clangd#codecomplete_timeout = 10
+```
+
+### Turn off autorestart behavior
+vim-clangd will detect the crashed clangd and restart it again as soon as possible.
+maybe you just don't need this and want to turn it off.
+
+Put this in your vimrc file
+```
+let g:clangd#restart_after_crash = 0
+```
+
 ### Code format the selected code
 
 you can use `:<C-u> ClangdFormat` to code format the specified code
