@@ -122,5 +122,7 @@ class EventDispatcher:
     def OnTimerCallback(self):
         log.debug('OnTimer')
         self.manager.HandleClientRequests()
+        if self.manager.FilterCurrentFile():
+            return
         self.manager.GetDiagnosticsForCurrentFile()
         self.manager.EchoErrorMessageForCurrentLine()
