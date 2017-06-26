@@ -92,12 +92,17 @@ class LSPClient():
             self._manager.on_server_down()
 
     def initialize(self):
-        rr = self._SendRequest(Initialize_REQUEST, {
-            'processId': os.getpid(),
-            'rootUri': 'file://' + os.getcwd(),
-            'capabilities': {},
-            'trace': 'off'
-        })
+        try:
+            rr = self._SendRequest(Initialize_REQUEST, {
+                'processId': os.getpid(),
+                'rootUri': 'file://' + os.getcwd(),
+                'capabilities': {},
+                'trace': 'off'
+            })
+        except TimedOutError as e:
+            # ignore timedout
+            rr = {'capabilities': ''}
+            pass
         log.info('clangd connected with piped fd')
         log.info('clangd capabilities: %s' % rr['capabilities'])
         self._manager.on_server_connected()
