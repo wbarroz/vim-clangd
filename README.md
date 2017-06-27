@@ -32,17 +32,31 @@
 |Implement Method                    |No        |No        |
 |Gen. Getters/Setters                |No        |No        |
 
-## How to use vim-clangd plugins
+## Install
 
-1. use vundle or other vim plugin manager to add vim-clangd in vimrc file
-such as
+Vim-clangd can be used with several package manager:
+* [Pathogen](https://github.com/tpope/vim-pathogen)
+  * `git clone https://github.com/Chilledheart/vim-clangd.git ~/.vim/bundle/vim-clangd`
+* [Vundle.vim](https://github.com/VundleVim/Vundle.vim)
+  * `Plugin 'Chilledheart/vim-clangd'`
+
+After installing, you still need clangd binary to work with it
+
 ```
-Plugin 'Chilledheart/vim-clangd'
+:ClangdInstallBinary
 ```
 
-2. setup clangd
+for more information refer to Advanced Usage
 
-start vim and run `:ClangdInstallBinary`
+## Supported Platform
+
+- Linux
+- Mac OS X
+- Windows (in plan)
+
+## Advanced Usage
+
+### Build Clangd
 
 These platforms' prebuilt clangd are provided:
 - [macosx](https://storage.googleapis.com/vim-clangd/clangd-macosx.tar.gz)
@@ -58,16 +72,6 @@ or you can build clangd by yourself
 vim-clangd will search builtin clangd and then fallback to clangd in the path.
 however there is no simple way to get a binary clangd yet including llvm
 official apt repo.
-
-3. start vim and enjoy
-
-## Supported Platform
-
-- Linux
-- Mac OS X
-- Windows (in plan)
-
-## Advanced Usage
 
 ### Specify other clangd instance
 if you have clangd not in the path
