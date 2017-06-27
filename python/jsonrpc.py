@@ -17,7 +17,12 @@ from threading import Thread
 from errno import EINTR
 from time import sleep
 from select import select
-import queue
+# try to keep compatibily with old 2.7
+try:
+    import queue
+except ImportError:
+    import Queue as queue
+
 DEFAULT_TIMEOUT_MS = 1000
 IDLE_INTERVAL_MS = 10
 
