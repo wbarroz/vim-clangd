@@ -13,3 +13,11 @@ RUN curl http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 RUN apt-get update -qq && apt-get install --no-install-recommends clang-3.9 -y && apt-get clean
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-3.9 50
 RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.9 50
+RUN apt-get purge cmake cmake-data -y
+RUN curl -o /tmp/cmake.sh https://cmake.org/files/v3.7/cmake-3.7.2-Linux-x86_64.sh \
+      && mkdir -p /opt/cmake \
+      && yes | bash /tmp/cmake.sh --prefix=/opt/cmake --exclude-subdir \
+      && ln -s /opt/cmake/bin/cmake /usr/local/bin/cmake \
+      && rm -f /tmp/cmake.sh
+RUN /opt/cmake/bin/cmake --version
+
