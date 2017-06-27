@@ -42,9 +42,9 @@ Plugin 'Chilledheart/vim-clangd'
 
 2. setup clangd
 
-start vim and run ":ClangdInstallBinary"
+start vim and run `:ClangdInstallBinary`
 
-These platforms are supported:
+These platforms' prebuilt clangd are provided:
 - [macosx](https://storage.googleapis.com/vim-clangd/clangd-macosx.tar.gz)
 - [debian 8](https://storage.googleapis.com/vim-clangd/clangd-debian-8.tar.gz)
 - [fedora](https://storage.googleapis.com/vim-clangd/clangd-fedora.tar.gz)
@@ -59,11 +59,13 @@ vim-clangd will search builtin clangd and then fallback to clangd in the path.
 however there is no simple way to get a binary clangd yet including llvm
 official apt repo.
 
-if you are using ubuntu, you can refer to [docker/Dockerfile.xenial](https://github.com/Chilledheart/vim-clangd/blob/master/docker/Dockerfile.xenial) as well.
-
-see more at [clang docs](https://clang.llvm.org/get_started.html) but "extra Clang tools" is not optional.
-
 3. start vim and enjoy
+
+## Supported Platform
+
+- Linux
+- Mac OS X
+- Windows (in plan)
 
 ## Advanced Usage
 
