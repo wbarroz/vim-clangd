@@ -413,6 +413,10 @@ fu! s:Format()
   Python manager.format()
 endf
 
+fu! s:DownloadBinary()
+  Python manager.downloadBinary(vim.eval('s:script_folder_path') + '/../script')
+endf
+
 fu! s:PyEval(line)
     if s:python_version == 3
         return py3eval(a:line)
@@ -439,5 +443,6 @@ command! ClangdStartServer call s:StartServer()
 command! ClangdStopServer call s:StopServer()
 command! ClangdRestartServer call s:RestartServer()
 command! ClangdFormat call s:Format()
+command! ClangdInstallBinary call s:DownloadBinary()
 
 call s:restore_cpo()

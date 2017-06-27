@@ -41,7 +41,17 @@ Plugin 'Chilledheart/vim-clangd'
 ```
 
 2. setup clangd
-you can do it by run this script
+
+start vim and run ":ClangdInstallBinary"
+
+These platforms are supported:
+- [macosx](https://storage.googleapis.com/vim-clangd/clangd-macosx.tar.gz)
+- [debian 8](https://storage.googleapis.com/vim-clangd/clangd-debian-8.tar.gz)
+- [fedora](https://storage.googleapis.com/vim-clangd/clangd-fedora.tar.gz)
+- [ubuntu 14.04](https://storage.googleapis.com/vim-clangd/clangd-ubuntu-14.04.tar.gz)
+- [ubuntu 16.04](https://storage.googleapis.com/vim-clangd/clangd-ubuntu-16.04.tar.gz)
+
+or you can build clangd by yourself
 ```
 ./script/build-clangd.sh
 ```
