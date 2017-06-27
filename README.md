@@ -34,7 +34,7 @@
 
 ## How to use vim-clangd plugins
 
-1. use vunble or other vim plugin manager to add vim-clangd in vimrc file
+1. use vundle or other vim plugin manager to add vim-clangd in vimrc file
 such as
 ```
 Plugin 'Chilledheart/vim-clangd'
