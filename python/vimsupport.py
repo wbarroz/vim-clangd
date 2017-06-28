@@ -160,6 +160,7 @@ def ConvertDiagnosticsToQfList(file_name, diagnostics):
 
 
 def EchoMessage(text):
+    log.warn(text)
     for line in str(text).split('\n'):
         vim.command('{0} \'{1}\''.format('echom', EscapeForVim(line)))
 
@@ -174,6 +175,7 @@ def EchoTextH(text):
         vim.command('{0} \'{1}\''.format('echoh', EscapeForVim(line)))
 
 def EchoErrors(text):
+    log.error(text)
     vim.command('{0} \'{1}\''.format('echoerr', EscapeForVim(text)))
 
 

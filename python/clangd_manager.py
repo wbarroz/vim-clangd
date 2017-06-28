@@ -9,6 +9,8 @@ import os
 from os.path import dirname, abspath, join, isfile
 from subprocess import check_output, CalledProcessError, Popen, check_call
 
+DOWNLOAD_INDEX_URL = 'https://storage.googleapis.com/vim-clangd/clangd-download-index.json'
+DOWNLOAD_URL_PREFIX = 'https://storage.googleapis.com/vim-clangd/'
 
 def GetUriFromFilePath(file_path):
     return 'file://%s' % file_path
@@ -629,85 +631,102 @@ class ClangdManager():
 
         self._UpdateBufferByTextEdits(buf, textedits)
 
-    def downloadBinary(self, script_path):
-        import platform
-        supported_platforms = [
-            {
-                'name':
-                'macosx',
-                'system':
-                'Darwin',
-                'dist': ('', '', ''),
-                'url':
-                'https://storage.googleapis.com/vim-clangd/clangd-macosx.tar.gz'
-            },
-            {
-                'name':
-                'debian-8',
-                'system':
-                'Linux',
-                'dist': ('Debian', '8', ''),
-                'url':
-                'https://storage.googleapis.com/vim-clangd/clangd-debian-8.tar.gz'
-            },
-            {
-                'name':
-                'fedora',
-                'system':
-                'Linux',
-                'dist': ('Fedora', '25', 'Twenty Five'),
-                'url':
-                'https://storage.googleapis.com/vim-clangd/clangd-fedora.tar.gz',
-            },
-            {
-                'name':
-                'ubuntu-14.04',
-                'system':
-                'Linux',
-                'dist': ('Ubuntu', '14.04', 'trusty'),
-                'url':
-                'https://storage.googleapis.com/vim-clangd/clangd-ubuntu-14.04.tar.gz',
-            },
-            {
-                'name':
-                'ubuntu-16.04',
-                'system':
-                'Linux',
-                'dist': ('Ubuntu', '16.04', 'xenial'),
-                'url':
-                'https://storage.googleapis.com/vim-clangd/clangd-ubuntu-16.04.tar.gz',
-            },
-        ]
-        plat = None
-        log.info('platform system %s dist %s' % (platform.system(), platform.dist()))
+    def _HashCheck(self, file_path, algorithm, checksum):
+        import hashlib
+        if not algorithm in ['md5', 'sha1']:
+            return vimsupport.PresentYesOrNoDialog(
+                'failed to do %s checksum on %s, should we use this file?' %
+                (algorithm, file_path))
+        with open(file_path, 'rb') as f:
+            # osx get wrong result if not put in the same time
+            os.fsync(f.fileno())
+            h = hashlib.new(algorithm)
+            while True:
+                data = f.read(4096)
+                if not data:
+                    break
+                h.update(data)
+            log.info('file %s checksum %s expected %s' %(file_path, h.hexdigest(), checksum))
+            if checksum == h.hexdigest():
+                return True
+        return vimsupport.PresentYesOrNoDialog(
+            'failed to do %s checksum on %s, should we use this file?' %
+            (algorithm, file_path))
 
-        platform_dist = platform.dist()
-        # dist turple is like this
-        # Ubuntu, 16.04, Xenial
-        # or Debian, 8.8, ''
-        # fix for debian
-        if platform_dist[0] == 'Debian':
-            platform_dist[1] = str(int(platform_dist[1]))
+    def _LoadDownloadIndex(self):
+        try:
+            from urllib.request import urlopen
+        except ImportError:
+            from urllib2 import urlopen
+        response = urlopen(DOWNLOAD_INDEX_URL)
+        import json
+        html = response.read()
+        data = json.loads(html.decode('utf-8'))
+        return data
+
+    def downloadBinary(self, script_path):
+        supported_platforms = self._LoadDownloadIndex()
+        plat = None
+
+        import platform
+        is_linux = False
+        is_win32 = False
+        is_osx   = False
+        if platform.system() == 'Linux':
+            is_linux = True
+            linux_dist = platform.dist()
+            # dist turple is like this
+            # Ubuntu, 16.04, Xenial
+            # or Debian, 8.8, ''
+            # fix for debian
+            if linux_dist[0] == 'Debian':
+                linux_dist[1] = str(int(linux_dist[1]))
+
+            platform_desc = '-'.join(linux_dist)
+        elif platform.system() == 'Darwin':
+            is_osx = True
+            v, _, _ = platform.mac_ver()
+            mac_ver = '.'.join(v.split('.')[:2])
+            platform_desc  = 'Mac OS X %s' % mac_ver
+        elif platform.system() == 'Windows':
+            is_win32 = True
+            win_ver, _, _ = platform.win32_ver()
+            platform_desc = 'Windows %s' % win_ver
+        else:
+            platform_desc = platform.system()
+
+        log.info('detected platform %s' % platform_desc)
 
         for supported_platform in supported_platforms:
             if supported_platform['system'] == platform.system():
-                if platform.system() == 'Linux':
-                    if supported_platform['dist'][0] != platform_dist[0] or supported_platform['dist'][1] != platform_dist[1] or supported_platform['dist'][2] != platform_dist[2]:
+                if is_linux:
+                    if supported_platform['dist'][0] != linux_dist[0] or supported_platform['dist'][1] != linux_dist[1] or supported_platform['dist'][2] != linux_dist[2]:
+                        continue
+                elif is_osx:
+                    if float(mac_ver) < float(supported_platform['mac_ver']):
                         continue
                 plat = supported_platform
                 break
         if not plat:
-            dist = '-'.join(platform.dist()) if platform.dist()[0] else ''
-            vimsupport.EchoMessage('non supported platform %s %s' %
-                                   (platform.system(), dist))
+            vimsupport.EchoMessage('non supported platform %s' % platform_desc)
             return
-        tarball_file = os.path.join(script_path, 'clangd.tar.gz')
-        log.warn('downloading clangd binary for platform %s' % plat['name'])
+        if not plat['url'].startswith(DOWNLOAD_URL_PREFIX):
+            vimsupport.EchoMessage('broken clangd %s' % plat['url'])
+            return
+
+        log.warn('downloading clangd binary from url %s' % plat['url'])
+
         try:
             from urllib.request import urlretrieve
         except ImportError:
             from urllib import urlretrieve
-        urlretrieve(plat['url'], tarball_file)
+        tarball_file, _ = urlretrieve(plat['url'])
+
+        if not self._HashCheck(tarball_file, 'md5', plat['md5sum']):
+            vimsupport.EchoMessage('bad checksum clangd binary for platform %s' % platform_desc)
+            return
+        log.warn('downloaded clangd binary for platform %s' % platform_desc)
+
         for dir_name in ['bin', 'lib']:
             dir_path = os.path.join(script_path, dir_name)
             if os.path.exists(dir_path):
@@ -718,5 +737,4 @@ class ClangdManager():
             os.unlink(tarball_file)
         except OSError:
             pass
-        log.warn('downloaded clangd binary for platform %s' % plat['name'])
         vimsupport.EchoMessage('clangd installed')
