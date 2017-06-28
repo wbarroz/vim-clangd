@@ -62,11 +62,12 @@ For the case of OS X/macOS case, you can download lastet vim from [MacVim](https
 ### Build Clangd
 
 These platforms' prebuilt clangd are provided:
-- [macosx](https://storage.googleapis.com/vim-clangd/clangd-macosx.tar.gz)
-- [debian 8](https://storage.googleapis.com/vim-clangd/clangd-debian-8.tar.gz)
-- [fedora](https://storage.googleapis.com/vim-clangd/clangd-fedora.tar.gz)
-- [ubuntu 14.04](https://storage.googleapis.com/vim-clangd/clangd-ubuntu-14.04.tar.gz)
-- [ubuntu 16.04](https://storage.googleapis.com/vim-clangd/clangd-ubuntu-16.04.tar.gz)
+- [Ubuntu 16.04](https://storage.googleapis.com/vim-clangd/clangd-ubuntu-16.04.tar.gz)
+- [Ubuntu 14.04](https://storage.googleapis.com/vim-clangd/clangd-ubuntu-14.04.tar.gz)
+- [Debian 8](https://storage.googleapis.com/vim-clangd/clangd-debian-8.tar.gz)
+- [Fedora 25](https://storage.googleapis.com/vim-clangd/clangd-fedora.tar.gz)
+- [OS X El Capitan](https://storage.googleapis.com/vim-clangd/clangd-macosx-10-11.tar.gz)
+- [macOS Sierra](https://storage.googleapis.com/vim-clangd/clangd-macosx-10-12.tar.gz)
 
 or you can build clangd by yourself
 ```
