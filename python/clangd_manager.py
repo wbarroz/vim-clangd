@@ -9,7 +9,7 @@ import os
 from os.path import dirname, abspath, join, isfile
 from subprocess import check_output, CalledProcessError, Popen, check_call
 
-DOWNLOAD_INDEX_URL = 'https://storage.googleapis.com/vim-clangd/clangd-download-index.json'
+DOWNLOAD_INDEX_URL = 'https://storage.googleapis.com/vim-clangd/REV306529/clangd-download-index.json'
 DOWNLOAD_URL_PREFIX = 'https://storage.googleapis.com/vim-clangd/'
 
 def GetUriFromFilePath(file_path):
