@@ -48,11 +48,14 @@ After installing, you still need clangd binary to work with it
 
 for more information refer to Advanced Usage
 
-## Supported Platform
+## Supported Vim and Platform
 
 - Linux
-- Mac OS X
+- Mac OS X (from 10.11)
 - Windows (in plan)
+
+Vim version 7.4.1578 with Python 2 or Python3 support is a minimum.
+For the case of OS X/macOS case, you can download lastet vim from [MacVim](https://github.com/macvim-dev/macvim/releases),
 
 ## Advanced Usage
 

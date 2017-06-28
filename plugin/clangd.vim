@@ -12,11 +12,11 @@ fu! s:restore_cpo()
 endf
 
 if v:version < 704
-  echomsg "requires Vim 7.4 or later"
+  echomsg "vim-clangd requires Vim 7.4 or later"
   call s:restore_cpo()
   finish
 elseif !has('python') && !has('python3')
-  echomsg "requires Python2 or Python3 support"
+  echomsg "vim-clangd requires Python2 or Python3 support"
   call s:restore_cpo()
   finish
 endif
