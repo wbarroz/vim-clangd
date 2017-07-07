@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-import glog as log
-import vim, vimsupport
+import clangd.glog as log
+import clangd.vimsupport as vimsupport
+import vim
 
 from time import time
 
@@ -44,6 +45,7 @@ class EventDispatcher:
 
     def OnVimEnter(self):
         log.debug('VimEnter')
+        log.info('enter')
         autostart = bool(vim.eval('g:clangd#autostart'))
         if autostart and not self.manager.isAlive():
             vimsupport.EchoText('vim-clanged is not running')

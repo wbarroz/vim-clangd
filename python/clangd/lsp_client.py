@@ -1,8 +1,8 @@
 # LSP Client
 # https://github.com/Microsoft/language-server-protocol/blob/master/protocol.md
-from jsonrpc import JsonRPCClient, TimedOutError
+from clangd.jsonrpc import JsonRPCClient, TimedOutError
 from subprocess import check_output, CalledProcessError, Popen
-import glog as log
+import clangd.glog as log
 import os
 
 Initialize_REQUEST = 'initialize'

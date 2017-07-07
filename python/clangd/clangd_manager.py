@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
-import vimsupport, vim
-from lsp_client import LSPClient, TimedOutError
-from trie import Trie
+import clangd.vimsupport as vimsupport
+import vim
+from clangd.lsp_client import LSPClient, TimedOutError
+from clangd.trie import Trie
 
-import glog as log
+import clangd.glog as log
 import os
 from os.path import dirname, abspath, join, isfile
 from subprocess import check_output, CalledProcessError, Popen, check_call
@@ -118,6 +119,9 @@ class ClangdManager():
         if confirmed or vimsupport.PresentYesOrNoDialog(
                 'Should we start clangd?'):
             clangd_executable = str(vim.eval('g:clangd#clangd_executable'))
+            if not clangd_executable:
+              vim_script_folder_path = vim.eval('s:script_folder_path')
+              clangd_executable = os.path.join(vim_script_folder_path, '..', 'script', 'bin', 'clangd')
             clangd_executable = os.path.expanduser(clangd_executable)
             clangd_log_path = os.path.expanduser(
                 vim.eval('g:clangd#log_path') + '/clangd.log')

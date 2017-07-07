@@ -12,11 +12,12 @@
 #               }
 #
 import json, os
-import glog as log
+import clangd.glog as log
 from threading import Thread
 from errno import EINTR
 from time import sleep
 from select import select
+import socket
 # try to keep compatibily with old 2.7
 try:
     import queue
@@ -127,6 +128,7 @@ class JsonRPCClientThread(Thread):
                     break
             if self._is_stop:
                 break
+            # Note that on Windows, it (select) only works for sockets;
             rlist, _, _ = select([self._output_fd], [], [],
                                          IDLE_INTERVAL_MS * 0.0001 * long_idle)
 

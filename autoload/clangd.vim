@@ -17,14 +17,14 @@ fu! clangd#Enable()
     return
   endif
   call s:SetUpFirstRun()
-  try
+  "try
     call s:SetUpPython()
-  catch /.*/
-    if v:exception != ""
-        echoerr 'failed to initialize clangd plugin, ' v:exception
-        return
-    endif
-  endtry
+  " catch /.*/
+  "   if v:exception != ""
+  "       echoerr 'failed to initialize clangd plugin, ' v:exception
+  "       return
+  "   endif
+  " endtry
   call s:TurnOffSyntasticForCFamily()
   call s:SetUpSyntasticSigns()
   call s:SetUpSyntasticHl()
@@ -49,9 +49,26 @@ endf
 
 " Sub Entrances
 fu! s:SetUpPython() abort
-  Python import sys, vim
-  Python sys.path.insert(0, vim.eval('s:script_folder_path') + '/../python')
-  Python from loader import manager, handler
+  exec s:PyUntilEOF
+import sys, os
+sys.path.insert(0, os.path.join(vim.eval('s:script_folder_path'), '..', 'python'))
+import clangd.glog as log
+try:
+  log_level = str(vim.eval('g:clangd#log_level'))
+  log_path = os.path.expanduser(str(vim.eval('g:clangd#log_path')))
+  if not os.path.exists(log_path):
+      os.makedirs(log_path)
+  log.init(log_level, os.path.join(log_path, 'vim-clangd.log'))
+
+  from clangd.clangd_manager import ClangdManager
+  from clangd.event_dispatcher import EventDispatcher
+  manager = ClangdManager()
+  handler = EventDispatcher(manager)
+except:
+  if log:
+    log.exception('failed to set up python')
+
+EOF
 endf
 
 fu! s:TurnOffSyntasticForCFamily()
@@ -115,15 +132,7 @@ endf
 
 fu! s:SetUpFirstRun()
     if !exists('g:clangd#clangd_executable')
-       if has("win32") || has("win32unix")
-         let clangd_path = s:script_folder_path . '/../script/bin/clangd.exe'
-       else
-         let clangd_path = s:script_folder_path . '/../script/bin/clangd'
-         if !filereadable(clangd_path)
-              clangd_path = 'clangd'
-         endif
-       endif
-       let g:clangd#clangd_executable = clangd_path
+       let g:clangd#clangd_executable = ''
     endif
     if !exists('g:clangd#completions_enabled')
        let g:clangd#completions_enabled = 1
@@ -155,9 +164,11 @@ fu! s:SetUpFirstRun()
     if g:clangd#py_version == 3
         let s:python_version = 3
         let cmd_exec = 'python3'
+        let s:PyUntilEOF = 'python3 << EOF'
     else
         let s:python_version = 2
         let cmd_exec = 'python'
+        let s:PyUntilEOF = 'python << EOF'
     endif
     exe 'command! -nargs=1 Python '.cmd_exec.' <args>'
 endf
@@ -417,7 +428,7 @@ fu! s:Format()
 endf
 
 fu! s:DownloadBinary()
-  Python manager.downloadBinary(vim.eval('s:script_folder_path') + '/../script')
+  Python manager.downloadBinary(os.path.join(vim.eval('s:script_folder_path'), '..', 'script'))
 endf
 
 fu! s:PyEval(line)

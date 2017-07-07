@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import vim
 import os
-import glog as log
+import clangd.glog as log
 
 
 def PyVersion():
