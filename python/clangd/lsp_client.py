@@ -35,6 +35,10 @@ def StartProcess(executable_name, clangd_log_path=None):
     fdOutRead, fdOutWrite = pipe()
     if os.name == 'nt' and not executable_name.endswith('.exe'):
         executable_name += '.exe'
+    if os.name != 'nt':
+        import fcntl
+        fcntl.fcntl(fdInWrite, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
+        fcntl.fcntl(fdOutRead, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
     cwd = os.path.dirname(executable_name)
     clangd = Popen(
         executable_name, stdin=fdInRead, stdout=fdOutWrite, stderr=fdClangd, cwd=cwd)
