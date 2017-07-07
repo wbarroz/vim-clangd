@@ -115,12 +115,15 @@ endf
 
 fu! s:SetUpFirstRun()
     if !exists('g:clangd#clangd_executable')
-       let clangd_path = s:script_folder_path . '/../script/bin/clangd'
-       if filereadable(clangd_path)
-            let g:clangd#clangd_executable = clangd_path
+       if has("win32") || has("win32unix")
+         let clangd_path = s:script_folder_path . '/../script/bin/clangd.exe'
        else
-            let g:clangd#clangd_executable = 'clangd'
+         let clangd_path = s:script_folder_path . '/../script/bin/clangd'
+         if !filereadable(clangd_path)
+              clangd_path = 'clangd'
+         endif
        endif
+       let g:clangd#clangd_executable = clangd_path
     endif
     if !exists('g:clangd#completions_enabled')
        let g:clangd#completions_enabled = 1

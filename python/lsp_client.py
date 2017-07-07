@@ -26,16 +26,18 @@ MAX_CLIENT_ERRORS = 100
 MAX_CLIENT_TIMEOUTS = 5000
 
 
-def StartProcess(name, clangd_log_path=None):
+def StartProcess(executable_name, clangd_log_path=None):
     from os import pipe, devnull
     if not clangd_log_path or not log.logger.isEnabledFor(log.DEBUG):
         clangd_log_path = devnull
     fdClangd = open(clangd_log_path, 'w+')
     fdInRead, fdInWrite = pipe()
     fdOutRead, fdOutWrite = pipe()
-    cwd = os.path.dirname(clangd_log_path)
+    if os.name == 'nt' and not executable_name.endswith('.exe'):
+        executable_name += '.exe'
+    cwd = os.path.dirname(executable_name)
     clangd = Popen(
-        name, stdin=fdInRead, stdout=fdOutWrite, stderr=fdClangd, cwd=cwd)
+        executable_name, stdin=fdInRead, stdout=fdOutWrite, stderr=fdClangd, cwd=cwd)
     return clangd, fdInWrite, fdOutRead, fdClangd
 
 

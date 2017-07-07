@@ -28,11 +28,17 @@ class EmulateTimer:
 class EventDispatcher:
     def __init__(self, manager):
         self.manager = manager
-        self._native_timer = bool(vim.eval('has("s:timer")'))
-        if self._native_timer:
+        self._timer = None
+
+    def _LazyInit(self):
+        native_timer = False
+        try:
+            native_timer = bool(vim.eval('has("s:timer")'))
+        except:
+            log.exception('native timer')
+        if native_timer:
             log.info('vim native timer found and used')
             # FIXME use abstract timer
-            self._timer = None
         else:
             self._timer = EmulateTimer(self)
 
@@ -42,6 +48,8 @@ class EventDispatcher:
         if autostart and not self.manager.isAlive():
             vimsupport.EchoText('vim-clanged is not running')
             return
+
+        self._LazyInit()
 
         if self._timer:
             self._timer.start()
