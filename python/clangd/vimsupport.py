@@ -5,8 +5,7 @@ import clangd.glog as log
 
 
 def PyVersion():
-  from sys import version_info
-  return version_info.major
+  return int(vim.eval('g:clangd#py_version'))
 
 # Given an object, returns a str object that's utf-8 encoded.
 def ToUtf8IfNeeded(value):

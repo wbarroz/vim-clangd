@@ -28,6 +28,7 @@ class EmulateTimer:
 
 class EventDispatcher:
     def __init__(self, manager):
+        log.info('using python %d' % vimsupport.PyVersion())
         self.manager = manager
         self._timer = None
 
@@ -44,8 +45,6 @@ class EventDispatcher:
             self._timer = EmulateTimer(self)
 
     def OnVimEnter(self):
-        log.debug('VimEnter')
-        log.info('enter')
         autostart = bool(vim.eval('g:clangd#autostart'))
         if autostart and not self.manager.isAlive():
             vimsupport.EchoText('vim-clanged is not running')

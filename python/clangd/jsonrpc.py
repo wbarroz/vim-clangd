@@ -11,13 +11,12 @@
 #               }
 #               }
 #
-import json, os
+import json, os, sys
 import clangd.glog as log
+from clangd.vimsupport import PyVersion
 from threading import Thread
 from errno import EINTR
 from time import sleep
-from select import select
-import socket
 # try to keep compatibily with old 2.7
 try:
     import queue
@@ -25,22 +24,100 @@ except ImportError:
     import Queue as queue
 
 DEFAULT_TIMEOUT_MS = 1000
-IDLE_INTERVAL_MS = 10
+IDLE_INTERVAL_MS = 25
+
+class Poller(object):
+    def __init__(self, rfds, wfds):
+        self._rfds = rfds
+        self._wfds = wfds
+
+    def shutdown(self):
+        pass
+
+    def poll(self, timeout_ms):
+        raise NotImplementedError('not okay')
+
+# FIXME this Win32Poller doesn't really work on non-overlapped io
+# class Win32Poller(Poller):
+#     def __init__(self, rfds, wfds):
+#         from clangd.iocp import CreateIoCompletionPort, GetQueuedCompletionStatus, INVALID_HANDLE_VALUE, CloseHandle
+#         from msvcrt import get_osfhandle
+#         if PyVersion() == 2:
+#             super(Win32Poller, self).__init__(rfds, wfds)
+#         else:
+#             super().__init__(rfds, wfds)
+#         self._rhandles = [ rfd.filehandle() for rfd in rfds ]
+#         self._whandles = [ rfd.filehandle() for wfd in wfds ]
+#         self._completion_port = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0)
+#         log.info('completion port created, %d' % self._completion_port)
+#         for rhandle in self._rhandles:
+#             CreateIoCompletionPort(rhandle, self._completion_port, rhandle, 0)
+#         for whandle in self._whandles:
+#             CreateIoCompletionPort(whandle, self._completion_port, whandle + 4096, 0)
+#
+#     def shutdown(self):
+#         if self._completion_port:
+#             CloseHandle(self._completion_port)
+#             log.info('completion port destroyed, %d' % self._completion_port)
+#
+#     def poll(self, timeout_ms):
+#         if not self._completion_port:
+#             return [], []
+#         rc, numOfBytes, completion_key, overlapped = GetQueuedCompletionStatus(self._completion_port, timeout_ms)
+#         if not rc:
+#             return [], []
+#         if completion_key >= 4096:
+#             return [], [completion_key - 4096]
+#         return [completion_key], []
+
+class Win32Poller(Poller):
+    def __init__(self, rfds, wfds):
+        if PyVersion() == 2:
+            super(Win32Poller, self).__init__(rfds, wfds)
+        else:
+            super().__init__(rfds, wfds)
+        self._rhandles = [ rfd.filehandle() for rfd in rfds ]
+        self._whandles = [ rfd.filehandle() for wfd in wfds ]
+
+    def poll(self, timeout_ms):
+        from select import select
+        rs, ws, _ = select(self._rhandles, self._whandles, [], timeout_ms)
+        # FIXME convert to fd
+        return rs, ws
+
+class PosixPoller(Poller):
+    def __init__(self, rfds, wfds):
+        if PyVersion() == 2:
+            super(PosixPoller, self).__init__(rfds, wfds)
+        else:
+            super().__init__(rfds, wfds)
+
+    def poll(self, timeout_ms):
+        from select import select
+        rfds, wfds = select(self._rfds, self._wfds, [], timeout_ms)
+        return rfds, wfds
 
 class TimedOutError(OSError):
     pass
 
 def EstimateUnreadBytes(fd):
     from array import array
-    from fcntl import ioctl
-    from termios import FIONREAD
-    buf = array('i', [0])
-    ioctl(fd, FIONREAD, buf, 1)
-    return buf[0]
+
+    if sys.platform == 'win32':
+        from iocp import _ioctlsocket, FIONREAD
+        return _ioctlsocket(fd.filehandle(), FIONREAD)
+    else:
+        from fcntl import ioctl
+        from termios import FIONREAD
+        buf = array('i', [0])
+        ioctl(fd, FIONREAD, buf, 1)
+        return buf[0]
 
 
 def write_utf8(fd, data):
     msg = data.encode('utf-8')
+    if sys.platform == 'win32':
+        fd = fd.fileno()
     while len(msg):
         try:
             written = os.write(fd, msg)
@@ -53,6 +130,8 @@ def write_utf8(fd, data):
 
 def read_utf8(fd, length):
     msg = bytes()
+    if sys.platform == 'win32':
+        fd = fd.fileno()
     while length:
         try:
             buf = os.read(fd, length)
@@ -72,6 +151,17 @@ class JsonRPCClientThread(Thread):
         self._output_fd = output_fd
         self._read_queue = read_queue
         self._write_queue = write_queue
+        if sys.platform == 'win32':
+            # from iocp import _ioctlsocket, FIONBIO
+            # _ioctlsocket(input_fd.filehandle(), FIONBIO, 1)
+            # _ioctlsocket(output_fd.filehandle(), FIONBIO, 1)
+            self._poller = Win32Poller([self._output_fd], [])
+        else:
+            self._poller = PosixPoller([self._output_fd], [])
+
+    def shutdown(self):
+        log.warn('io thread shutdown')
+        self._poller.shutdown()
 
     def _SendMsg(self, r):
         request = json.dumps(r, separators=(',', ':'), sort_keys=True)
@@ -106,6 +196,14 @@ class JsonRPCClientThread(Thread):
         self._read_queue.put(OSError('shutdown unexcepted'))
 
     def run(self):
+        log.warn('io thread starts')
+        try:
+            self._Run()
+        except:
+            log.exception('failed io thread')
+        self.shutdown()
+
+    def _Run(self):
         long_idle = 0
         while not self._is_stop:
             while True:
@@ -129,8 +227,7 @@ class JsonRPCClientThread(Thread):
             if self._is_stop:
                 break
             # Note that on Windows, it (select) only works for sockets;
-            rlist, _, _ = select([self._output_fd], [], [],
-                                         IDLE_INTERVAL_MS * 0.0001 * long_idle)
+            rlist, _ = self._poller.poll(IDLE_INTERVAL_MS * long_idle)
 
             # ticky to detect clangd's failure
             if rlist and EstimateUnreadBytes(self._output_fd) == 0:
@@ -150,8 +247,6 @@ class JsonRPCClientThread(Thread):
                 self._read_queue.put(rr)
             if long_idle < 100:
                 long_idle += 1
-        pass
-
 
 class JsonRPCClient:
     def __init__(self, request_observer, input_fd, output_fd):
@@ -190,7 +285,7 @@ class JsonRPCClient:
             try:
                 rr = self._read_queue.get_nowait()
             except queue.Empty:
-                sleep(IDLE_INTERVAL_MS * 0.0001)
+                sleep(IDLE_INTERVAL_MS * 0.001)
                 timeout_ms -= IDLE_INTERVAL_MS
                 continue
             if isinstance(rr, OSError):

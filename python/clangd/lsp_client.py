@@ -25,20 +25,80 @@ PublishDiagnostics_NOTIFICATION = 'textDocument/publishDiagnostics'
 MAX_CLIENT_ERRORS = 100
 MAX_CLIENT_TIMEOUTS = 5000
 
+class WinSocket(object):
+    def __init__(self, handle = None):
+        import socket
+        from clangd.iocp import WSASocket
+        from msvcrt import open_osfhandle
+        if not handle:
+            handle = WSASocket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
+        self._file_handle = handle
+        self._file_no = open_osfhandle(self._file_handle, 0)
+
+    def close(self):
+        from clangd.iocp import CloseHandle
+        CloseHandle(self._file_handle)
+
+    def fileno(self):
+        return self._file_no
+
+    def filehandle(self):
+        return self._file_handle
+
+    def bind(self, addr):
+        from clangd.iocp import _bind
+        _bind(self._file_handle, addr)
+
+    def listen(self, backlog):
+        from clangd.iocp import _listen
+        _listen(self._file_handle, backlog);
+
+    def accept(self):
+        from clangd.iocp import WSAAccept
+        s, addr = WSAAccept(self._file_handle)
+        return WinSocket(s), addr
+
+    def connect(self, addr):
+        from clangd.iocp import WSAConnect
+        WSAConnect(self._file_handle, addr)
+
+    def getsockname(self):
+        from clangd.iocp import _getsockname
+        return _getsockname(self._file_handle)
+
+# tcp-emulated socketpair
+def win32_socketpair():
+    localhost = '127.0.0.1'
+    listener = WinSocket()
+    listener.bind((localhost, 0))
+    listener.listen(1)
+    addr = listener.getsockname()
+    client = WinSocket()
+    client.connect(addr)
+    server, server_addr = listener.accept()
+    client_addr = client.getsockname()
+    if server_addr != client_addr:
+        raise OSError('win32 socketpair failure')
+    listener.close()
+    return server, client
 
 def StartProcess(executable_name, clangd_log_path=None):
-    from os import pipe, devnull
+    from os import devnull
     if not clangd_log_path or not log.logger.isEnabledFor(log.DEBUG):
         clangd_log_path = devnull
     fdClangd = open(clangd_log_path, 'w+')
-    fdInRead, fdInWrite = pipe()
-    fdOutRead, fdOutWrite = pipe()
     if os.name == 'nt' and not executable_name.endswith('.exe'):
         executable_name += '.exe'
     if os.name != 'nt':
+        from os import pipe
+        fdInRead, fdInWrite = pipe()
+        fdOutRead, fdOutWrite = pipe()
         import fcntl
         fcntl.fcntl(fdInWrite, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
         fcntl.fcntl(fdOutRead, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
+    else:
+        fdInRead, fdInWrite = win32_socketpair()
+        fdOutRead, fdOutWrite = win32_socketpair()
     cwd = os.path.dirname(executable_name)
     clangd = Popen(
         executable_name, stdin=fdInRead, stdout=fdOutWrite, stderr=fdClangd, cwd=cwd)
@@ -104,8 +164,9 @@ class LSPClient():
                 'rootUri': 'file://' + os.getcwd(),
                 'capabilities': {},
                 'trace': 'off'
-            })
+            }, timeout_ms = 5000)
         except TimedOutError as e:
+            log.exception('initialize timedout')
             # ignore timedout
             rr = {'capabilities': ''}
             pass

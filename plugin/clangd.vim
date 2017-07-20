@@ -19,8 +19,8 @@ elseif !has('python') && !has('python3')
   echomsg "vim-clangd requires Python2 or Python3 support"
   call s:restore_cpo()
   finish
-elseif has('win32') || has('win32unix')
-  echomsg "vim-clangd doesn't support windows yet"
+elseif has('win32unix')
+  echomsg "vim-clangd doesn't support cygwin yet"
   call s:restore_cpo()
   finish
 endif

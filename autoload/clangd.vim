@@ -50,7 +50,7 @@ endf
 " Sub Entrances
 fu! s:SetUpPython() abort
   exec s:PyUntilEOF
-import sys, os
+import sys, os, vim
 sys.path.insert(0, os.path.join(vim.eval('s:script_folder_path'), '..', 'python'))
 import clangd.glog as log
 try:
