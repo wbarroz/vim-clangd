@@ -65,7 +65,9 @@ class EventDispatcher:
         try:
             # BufUnload won't be called at exit, you need to call it yourself
             self.manager.CloseAllFiles()
+            log.info('vim-clangd closed all files')
             self.manager.stopServer(confirmed=True)
+            log.info('vim-clangd stopped server')
         except:
             log.exception("vim-clangd plugin unload with error")
         log.info('vim-clangd plugin fully unloaded')

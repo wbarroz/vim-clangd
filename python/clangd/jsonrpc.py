@@ -81,7 +81,7 @@ class Win32Poller(Poller):
 
     def poll(self, timeout_ms):
         from select import select
-        rs, ws, _ = select(self._rhandles, self._whandles, [], timeout_ms)
+        rs, ws, _ = select(self._rhandles, self._whandles, [], timeout_ms * 0.001)
         # FIXME convert to fd
         return rs, ws
 
@@ -94,7 +94,7 @@ class PosixPoller(Poller):
 
     def poll(self, timeout_ms):
         from select import select
-        rfds, wfds = select(self._rfds, self._wfds, [], timeout_ms)
+        rfds, wfds = select(self._rfds, self._wfds, [], timeout_ms * 0.001)
         return rfds, wfds
 
 class TimedOutError(OSError):
@@ -104,8 +104,8 @@ def EstimateUnreadBytes(fd):
     from array import array
 
     if sys.platform == 'win32':
-        from iocp import _ioctlsocket, FIONREAD
-        return _ioctlsocket(fd.filehandle(), FIONREAD)
+        from clangd.iocp import _ioctlsocket, FIONREAD
+        return int(_ioctlsocket(fd.filehandle(), FIONREAD))
     else:
         from fcntl import ioctl
         from termios import FIONREAD
@@ -152,9 +152,9 @@ class JsonRPCClientThread(Thread):
         self._read_queue = read_queue
         self._write_queue = write_queue
         if sys.platform == 'win32':
-            # from iocp import _ioctlsocket, FIONBIO
-            # _ioctlsocket(input_fd.filehandle(), FIONBIO, 1)
-            # _ioctlsocket(output_fd.filehandle(), FIONBIO, 1)
+            from clangd.iocp import _ioctlsocket, FIONBIO
+            _ioctlsocket(input_fd.filehandle(), FIONBIO, 1)
+            _ioctlsocket(output_fd.filehandle(), FIONBIO, 1)
             self._poller = Win32Poller([self._output_fd], [])
         else:
             self._poller = PosixPoller([self._output_fd], [])
@@ -226,7 +226,7 @@ class JsonRPCClientThread(Thread):
                     break
             if self._is_stop:
                 break
-            # Note that on Windows, it (select) only works for sockets;
+
             rlist, _ = self._poller.poll(IDLE_INTERVAL_MS * long_idle)
 
             # ticky to detect clangd's failure

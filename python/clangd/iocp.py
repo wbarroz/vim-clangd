@@ -7,7 +7,7 @@ from ctypes import create_string_buffer, c_ushort, c_ubyte, c_char, c_short,\
                    string_at
 
 from ctypes.wintypes import HANDLE, ULONG, DWORD, BOOL, LPCSTR,\
-                            LPCWSTR, UINT, Structure
+                            LPCWSTR, UINT
 
 from ctypes import sizeof as c_sizeof
 
@@ -323,4 +323,4 @@ low_ioctlsocket.errcheck = _zero_throw
 def _ioctlsocket(s, cmd, arg = 0):
     ul_arg = c_ulong(arg)
     low_ioctlsocket(s, cmd, byref(ul_arg))
-    return ul_arg
+    return unpack('<L', ul_arg)[0]

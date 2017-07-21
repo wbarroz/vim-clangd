@@ -127,8 +127,12 @@ class LSPClient():
             self._clangd.kill()
         log.info('clangd stopped, pid %d' % self._clangd.pid)
         self._clangd_logfd.close()
-        os.close(self._input_fd)
-        os.close(self._output_fd)
+        if sys.platform == 'win32':
+            self._input_fd.close()
+            self._output_fd.close()
+        else:
+            os.close(self._input_fd)
+            os.close(self._output_fd)
 
     def isAlive(self):
         return self._is_alive and self._clangd.poll(
