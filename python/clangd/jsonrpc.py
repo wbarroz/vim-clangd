@@ -37,38 +37,6 @@ class Poller(object):
     def poll(self, timeout_ms):
         raise NotImplementedError('not okay')
 
-# FIXME this Win32Poller doesn't really work on non-overlapped io
-# class Win32Poller(Poller):
-#     def __init__(self, rfds, wfds):
-#         from clangd.iocp import CreateIoCompletionPort, GetQueuedCompletionStatus, INVALID_HANDLE_VALUE, CloseHandle
-#         from msvcrt import get_osfhandle
-#         if PyVersion() == 2:
-#             super(Win32Poller, self).__init__(rfds, wfds)
-#         else:
-#             super().__init__(rfds, wfds)
-#         self._rhandles = [ rfd.filehandle() for rfd in rfds ]
-#         self._whandles = [ rfd.filehandle() for wfd in wfds ]
-#         self._completion_port = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0)
-#         log.info('completion port created, %d' % self._completion_port)
-#         for rhandle in self._rhandles:
-#             CreateIoCompletionPort(rhandle, self._completion_port, rhandle, 0)
-#         for whandle in self._whandles:
-#             CreateIoCompletionPort(whandle, self._completion_port, whandle + 4096, 0)
-#
-#     def shutdown(self):
-#         if self._completion_port:
-#             CloseHandle(self._completion_port)
-#             log.info('completion port destroyed, %d' % self._completion_port)
-#
-#     def poll(self, timeout_ms):
-#         if not self._completion_port:
-#             return [], []
-#         rc, numOfBytes, completion_key, overlapped = GetQueuedCompletionStatus(self._completion_port, timeout_ms)
-#         if not rc:
-#             return [], []
-#         if completion_key >= 4096:
-#             return [], [completion_key - 4096]
-#         return [completion_key], []
 
 class Win32Poller(Poller):
     def __init__(self, rfds, wfds):

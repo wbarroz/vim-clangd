@@ -86,70 +86,6 @@ def CloseHandle(hObject):
     lowCloseHandle(hObject)
 
 
-lowCreateIoCompletionPort = windll.kernel32.CreateIoCompletionPort
-lowCreateIoCompletionPort.argtypes = (HANDLE, HANDLE, PULONG_PTR, DWORD)
-lowCreateIoCompletionPort.restype = HANDLE
-lowCreateIoCompletionPort.errcheck = _bool_error_throw
-
-
-def CreateIoCompletionPort(fileHandle, existingCompletionPort, completionKey,
-                           numThreads):
-    if existingCompletionPort == None:
-        existingCompletionPort = 0
-    ck_ulong = c_ulong(completionKey)
-    ret = lowCreateIoCompletionPort(fileHandle, existingCompletionPort,
-                                    byref(ck_ulong), numThreads)
-    return ret
-
-
-'''
-BOOL WINAPI GetQueuedCompletionStatus(
-  __in   HANDLE CompletionPort,
-  __out  LPDWORD lpNumberOfBytes,
-  __out  PULONG_PTR lpCompletionKey,
-  __out  LPOVERLAPPED *lpOverlapped,
-  __in   DWORD dwMilliseconds
-);
-'''
-'''
-(int, int, int, PyOVERLAPPED) = GetQueuedCompletionStatus(hPort, timeOut )
-rc, NumberOfBytesTransferred, CompletionKey, overlapped
-'''
-
-lowGetQueuedCompletionStatus = windll.kernel32.GetQueuedCompletionStatus
-lowGetQueuedCompletionStatus.argtypes = (HANDLE, POINTER(DWORD),
-                                         POINTER(c_ulong),
-                                         POINTER(LPOVERLAPPED), DWORD)
-lowGetQueuedCompletionStatus.restype = BOOL
-lowGetQueuedCompletionStatus.errcheck = _bool_error_check
-
-
-def GetQueuedCompletionStatus(hPort, timeOut):
-    overlapped = pointer(LPOVERLAPPED())
-    nob = DWORD()
-
-    ck = c_ulong()
-    rc = lowGetQueuedCompletionStatus(hPort,
-                                      pointer(nob),
-                                      pointer(ck), overlapped, timeOut)
-    #return (rc, nob, ck, overlapped)
-    overlapped = overlapped and overlapped.contents
-    nob = nob.value
-    ck = ck.value
-    return (rc, nob, ck, overlapped)
-
-
-lowSetNamedPipeHandleState = windll.kernel32.SetNamedPipeHandleState
-lowSetNamedPipeHandleState.argtypes = (HANDLE, LPDWORD, LPDWORD, LPDWORD)
-lowSetNamedPipeHandleState.restype = BOOL
-lowSetNamedPipeHandleState.errcheck = _bool_error_check
-
-
-def SetNamedPipeHandleState(hObject):
-    rc = lowSetNamedPipeHandleState(hObject, byref(PIPE_NOWAIT), None, None)
-    return rc
-
-
 lowWSAGetLastError = windll.ws2_32.WSAGetLastError
 lowWSAGetLastError.argtype = []
 lowWSAGetLastError.restype = c_int
@@ -246,14 +182,12 @@ def WSAConnect(s, addr):
     sa_addr.sin_port = socket.htons(port)
     sa_addr.sin_addr.S_addr = unpack('<i', socket.inet_aton(host))[0]
 
-    lowWSAConnect(s,
-                  byref(sa_addr),
-                  c_sizeof(sa_addr), None, None, None, None)
+    lowWSAConnect(s, byref(sa_addr), c_sizeof(sa_addr), None, None, None, None)
 
 
 lowWSAAccept = windll.ws2_32.WSAAccept
-lowWSAAccept.argtypes = (SOCKET, POINTER(sockaddr_in), POINTER(c_int), c_void_p,
-                         POINTER(DWORD))
+lowWSAAccept.argtypes = (SOCKET, POINTER(sockaddr_in), POINTER(c_int),
+                         c_void_p, POINTER(DWORD))
 lowWSAAccept.restype = SOCKET
 lowWSAAccept.errcheck = _invalid_handle_throw
 
@@ -311,6 +245,7 @@ def _getsockname(s):
     addr = (host, port)
     return addr
 
+
 # from windows sdk
 FIONREAD = 0x4004667f
 FIONBIO = 0x8004667e
@@ -320,7 +255,8 @@ low_ioctlsocket.argtypes = (SOCKET, c_long, POINTER(c_ulong))
 low_ioctlsocket.restype = c_int
 low_ioctlsocket.errcheck = _zero_throw
 
-def _ioctlsocket(s, cmd, arg = 0):
+
+def _ioctlsocket(s, cmd, arg=0):
     ul_arg = c_ulong(arg)
     low_ioctlsocket(s, cmd, byref(ul_arg))
     return unpack('<L', ul_arg)[0]
