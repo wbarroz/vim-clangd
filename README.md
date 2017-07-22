@@ -52,22 +52,24 @@ for more information refer to Advanced Usage
 
 - Linux
 - Mac OS X (from 10.11)
-- Windows (native only, cygwin is in plan)
+- Windows (native only,  cygwin is in plan)
 
 Vim version 7.4.1578 with Python 2 or Python3 support is a minimum.
 For the case of OS X/macOS case, you can download lastet vim from [MacVim](https://github.com/macvim-dev/macvim/releases),
+
+Windows needs Visual C++ 2015 Runtime which could be downloaded from [this link](https://www.microsoft.com/en-us/download/details.aspx?id=48145)
 
 ## Advanced Usage
 
 ### Build Clangd
 
 These platforms' prebuilt clangd are provided:
-- [Ubuntu 16.04](https://storage.googleapis.com/vim-clangd/clangd-ubuntu-16.04.tar.gz)
-- [Ubuntu 14.04](https://storage.googleapis.com/vim-clangd/clangd-ubuntu-14.04.tar.gz)
-- [Debian 8](https://storage.googleapis.com/vim-clangd/clangd-debian-8.tar.gz)
-- [Fedora 25](https://storage.googleapis.com/vim-clangd/clangd-fedora.tar.gz)
-- [OS X El Capitan](https://storage.googleapis.com/vim-clangd/clangd-macosx-10-11.tar.gz)
-- [macOS Sierra](https://storage.googleapis.com/vim-clangd/clangd-macosx-10-12.tar.gz)
+- Ubuntu 16.04
+- Ubuntu 14.04
+- Debian 8
+- Fedora 25
+- OS X El Capitan or later (including macOS Sierra)
+- Windows with VS2015
 
 or you can build clangd by yourself
 ```
