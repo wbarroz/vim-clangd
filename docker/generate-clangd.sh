@@ -22,5 +22,5 @@ else
   build_clangd debian-8
   build_clangd ubuntu-14.04
   build_clangd ubuntu-16.04
-  build_clangd fedora
+  build_clangd fedora-25
 fi
