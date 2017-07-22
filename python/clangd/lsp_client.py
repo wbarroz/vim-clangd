@@ -51,7 +51,7 @@ class WinSocket(object):
 
     def listen(self, backlog):
         from clangd.iocp import _listen
-        _listen(self._file_handle, backlog);
+        _listen(self._file_handle, backlog)
 
     def accept(self):
         from clangd.iocp import WSAAccept
@@ -83,25 +83,51 @@ def win32_socketpair():
     return server, client
 
 def StartProcess(executable_name, clangd_log_path=None):
-    from os import devnull
     if not clangd_log_path or not log.logger.isEnabledFor(log.DEBUG):
-        clangd_log_path = devnull
+        clangd_log_path = os.devnull
     fdClangd = open(clangd_log_path, 'w+')
+
+    # fix executable file name under windows (both cygwin and native win32)
     if os.name == 'nt' and not executable_name.endswith('.exe'):
         executable_name += '.exe'
-    if os.name != 'nt':
+
+    # apply platform-specific hacks
+    if sys.platform == 'win32':
+        # for posix or cygwin
         from os import pipe
+        import fcntl
         fdInRead, fdInWrite = pipe()
         fdOutRead, fdOutWrite = pipe()
-        import fcntl
         fcntl.fcntl(fdInWrite, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
         fcntl.fcntl(fdOutRead, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
     else:
+        # only native win32
         fdInRead, fdInWrite = win32_socketpair()
         fdOutRead, fdOutWrite = win32_socketpair()
     cwd = os.path.dirname(executable_name)
-    clangd = Popen(
-        executable_name, stdin=fdInRead, stdout=fdOutWrite, stderr=fdClangd, cwd=cwd)
+    # apply native win32's hack
+    if sys.platform == 'win32':
+        # we need hide this subprocess's window under windows, or it opens a new visible window
+        import subprocess
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags = subprocess.STARTF_USESTDHANDLES | subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+        clangd = Popen(
+            executable_name,
+            stdin=fdInRead,
+            stdout=fdOutWrite,
+            stderr=fdClangd,
+            cwd=cwd,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            startupinfo=startupinfo)
+    else:
+        clangd = Popen(
+            executable_name,
+            stdin=fdInRead,
+            stdout=fdOutWrite,
+            stderr=fdClangd,
+            cwd=cwd)
+
     return clangd, fdInWrite, fdOutRead, fdClangd
 
 
@@ -128,9 +154,11 @@ class LSPClient():
         log.info('clangd stopped, pid %d' % self._clangd.pid)
         self._clangd_logfd.close()
         if sys.platform == 'win32':
+            # only native win32
             self._input_fd.close()
             self._output_fd.close()
         else:
+            # posix or cygwin
             os.close(self._input_fd)
             os.close(self._output_fd)
 
