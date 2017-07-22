@@ -100,9 +100,9 @@ build_clangd() {
 }
 
 post_build() {
-    mkdir -p bin lib/clang/5.0.0
+    mkdir -p bin lib/clang/6.0.0
     cp -f {build-llvm/,}bin/clangd
-    cp -rf build-llvm/lib/clang/5.0.0/include lib/clang/5.0.0/
+    cp -rf build-llvm/lib/clang/6.0.0/include lib/clang/6.0.0/
     echo "clangd is built at $PWD/bin/clangd"
 }
 
