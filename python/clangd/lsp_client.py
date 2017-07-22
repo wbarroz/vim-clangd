@@ -3,7 +3,7 @@
 from clangd.jsonrpc import JsonRPCClient, TimedOutError
 from subprocess import check_output, CalledProcessError, Popen
 import clangd.glog as log
-import os
+import os, sys
 
 Initialize_REQUEST = 'initialize'
 Shutdown_REQUEST = 'shutdown'
@@ -92,7 +92,7 @@ def StartProcess(executable_name, clangd_log_path=None):
         executable_name += '.exe'
 
     # apply platform-specific hacks
-    if sys.platform == 'win32':
+    if sys.platform != 'win32':
         # for posix or cygwin
         from os import pipe
         import fcntl
