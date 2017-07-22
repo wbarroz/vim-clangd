@@ -62,7 +62,7 @@ class PosixPoller(Poller):
 
     def poll(self, timeout_ms):
         from select import select
-        rfds, wfds = select(self._rfds, self._wfds, [], timeout_ms * 0.001)
+        rfds, wfds, _ = select(self._rfds, self._wfds, [], timeout_ms * 0.001)
         return rfds, wfds
 
 class TimedOutError(OSError):
