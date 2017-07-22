@@ -6,7 +6,7 @@ from clangd.lsp_client import LSPClient, TimedOutError
 from clangd.trie import Trie
 
 import clangd.glog as log
-import os
+import os, sys
 from os.path import dirname, abspath, join, isfile
 from subprocess import check_output, CalledProcessError, Popen, check_call
 
@@ -643,14 +643,14 @@ class ClangdManager():
                 (algorithm, file_path))
         with open(file_path, 'rb') as f:
             # osx get wrong result if not put in the same time
-            os.fsync(f.fileno())
+            if sys.platform != 'win32':
+                os.fsync(f.fileno())
             h = hashlib.new(algorithm)
             while True:
                 data = f.read(4096)
                 if not data:
                     break
                 h.update(data)
-            log.info('file %s checksum %s expected %s' %(file_path, h.hexdigest(), checksum))
             if checksum == h.hexdigest():
                 return True
         return vimsupport.PresentYesOrNoDialog(
@@ -671,6 +671,8 @@ class ClangdManager():
     def downloadBinary(self, script_path):
         supported_platforms = self._LoadDownloadIndex()
         plat = None
+        self._in_shutdown = True
+        self.stopServer(confirmed=True)
 
         import platform
         is_linux = False
@@ -739,9 +741,17 @@ class ClangdManager():
             if os.path.exists(dir_path):
                 from shutil import rmtree
                 rmtree(dir_path)
-        check_call(['tar', '-C', script_path, '-xf', tarball_file])
+        if is_win32:
+            import tarfile
+            tar = tarfile.open(name=tarball_file, mode='r:gz')
+            tar.extractall(path=script_path)
+        else:
+            check_call(['tar', '-C', script_path, '-xf', tarball_file])
         try:
             os.unlink(tarball_file)
         except OSError:
             pass
         vimsupport.EchoMessage('clangd installed')
+
+        self._in_shutdown = False
+        self.startServer(confirmed=True)
