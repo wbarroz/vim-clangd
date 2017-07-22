@@ -120,8 +120,8 @@ class ClangdManager():
                 'Should we start clangd?'):
             clangd_executable = str(vim.eval('g:clangd#clangd_executable'))
             if not clangd_executable:
-              vim_script_folder_path = vim.eval('s:script_folder_path')
-              clangd_executable = os.path.join(vim_script_folder_path, '..', 'script', 'bin', 'clangd')
+                vim_script_folder_path = vim.eval('s:script_folder_path')
+                clangd_executable = os.path.join(vim_script_folder_path, '..', 'script', 'bin', 'clangd')
             clangd_executable = os.path.expanduser(clangd_executable)
             clangd_log_path = os.path.expanduser(
                 vim.eval('g:clangd#log_path') + '/clangd.log')
@@ -694,7 +694,7 @@ class ClangdManager():
             platform_desc  = 'Mac OS X %s' % mac_ver
         elif platform.system() == 'Windows':
             is_win32 = True
-            win_ver, _, _ = platform.win32_ver()
+            win_ver, _, _, _ = platform.win32_ver()
             platform_desc = 'Windows %s' % win_ver
         else:
             platform_desc = platform.system()
@@ -708,6 +708,9 @@ class ClangdManager():
                         continue
                 elif is_osx:
                     if float(mac_ver) < float(supported_platform['mac_ver']):
+                        continue
+                elif is_win32:
+                    if float(win_ver) < float(supported_platform['win_ver']):
                         continue
                 plat = supported_platform
                 break
