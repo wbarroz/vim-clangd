@@ -15,74 +15,38 @@ import json
 import os
 from sys import platform as sys_platform
 from clangd import glog as log
-from clangd.vimsupport import PyVersion
 from threading import Thread
 from errno import EINTR
 from time import sleep
+from array import array
 # try to keep compatibily with old 2.7
 try:
     import queue
 except ImportError:
     import Queue as queue
 
+# platform specific
+if sys_platform == 'win32':
+    from clangd.poller import Win32Poller as Poller
+    from clangd.iocp import _ioctlsocket, FIONREAD, FIONBIO
+else:
+    from clangd.poller import PosixPoller as Poller
+    from fcntl import ioctl
+    from termios import FIONREAD
+
 DEFAULT_TIMEOUT_MS = 1000
 IDLE_INTERVAL_MS = 25
-
-class Poller(object):
-    def __init__(self, rfds, wfds):
-        self._rfds = rfds
-        self._wfds = wfds
-
-    def shutdown(self):
-        pass
-
-    def poll(self, timeout_ms):
-        raise NotImplementedError('not okay')
-
-
-class Win32Poller(Poller):
-    def __init__(self, rfds, wfds):
-        if PyVersion() == 2:
-            super(Win32Poller, self).__init__(rfds, wfds)
-        else:
-            super().__init__(rfds, wfds)
-        self._rhandles = [ rfd.filehandle() for rfd in rfds ]
-        self._whandles = [ rfd.filehandle() for wfd in wfds ]
-
-    def poll(self, timeout_ms):
-        from select import select
-        rs, ws, _ = select(self._rhandles, self._whandles, [], timeout_ms * 0.001)
-        # FIXME convert to fd
-        return rs, ws
-
-class PosixPoller(Poller):
-    def __init__(self, rfds, wfds):
-        if PyVersion() == 2:
-            super(PosixPoller, self).__init__(rfds, wfds)
-        else:
-            super().__init__(rfds, wfds)
-
-    def poll(self, timeout_ms):
-        from select import select
-        rfds, wfds, _ = select(self._rfds, self._wfds, [], timeout_ms * 0.001)
-        return rfds, wfds
 
 class TimedOutError(OSError):
     pass
 
 def EstimateUnreadBytes(fd):
-    from array import array
-
     if sys_platform == 'win32':
-        from clangd.iocp import _ioctlsocket, FIONREAD
         return int(_ioctlsocket(fd.filehandle(), FIONREAD))
     else:
-        from fcntl import ioctl
-        from termios import FIONREAD
         buf = array('i', [0])
         ioctl(fd, FIONREAD, buf, 1)
         return buf[0]
-
 
 def write_utf8(fd, data):
     msg = data.encode('utf-8')
@@ -122,12 +86,9 @@ class JsonRPCClientThread(Thread):
         self._read_queue = read_queue
         self._write_queue = write_queue
         if sys_platform == 'win32':
-            from clangd.iocp import _ioctlsocket, FIONBIO
             _ioctlsocket(input_fd.filehandle(), FIONBIO, 1)
             _ioctlsocket(output_fd.filehandle(), FIONBIO, 1)
-            self._poller = Win32Poller([self._output_fd], [])
-        else:
-            self._poller = PosixPoller([self._output_fd], [])
+        self._poller = Poller([self._output_fd], [])
 
     def shutdown(self):
         log.warn('io thread shutdown')
