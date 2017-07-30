@@ -1,7 +1,7 @@
 """ poller for cross-platform """
 
 from select import select
-from clangd.vimsupport import PyVersion
+from clangd.vimsupport import PY2
 
 class Poller(object):
     def __init__(self, rfds, wfds):
@@ -17,7 +17,7 @@ class Poller(object):
 
 class Win32Poller(Poller):
     def __init__(self, rfds, wfds):
-        if PyVersion() == 2:
+        if PY2:
             super(Win32Poller, self).__init__(rfds, wfds)
         else:
             super().__init__(rfds, wfds)
@@ -31,7 +31,7 @@ class Win32Poller(Poller):
 
 class PosixPoller(Poller):
     def __init__(self, rfds, wfds):
-        if PyVersion() == 2:
+        if PY2:
             super(PosixPoller, self).__init__(rfds, wfds)
         else:
             super().__init__(rfds, wfds)

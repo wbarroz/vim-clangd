@@ -1,6 +1,6 @@
 from time import time
 from clangd import glog as log
-from clangd.vimsupport import GetBoolValue, PyVersion, EchoText, CurrentFileTypes
+from clangd.vimsupport import GetBoolValue, PY_VERSION, PY2, EchoText, CurrentFileTypes
 
 
 class EmulateTimer(object):
@@ -25,7 +25,7 @@ class EmulateTimer(object):
 
 class EventDispatcher(object):
     def __init__(self, manager):
-        log.info('using python %d' % PyVersion())
+        log.info('using python %d' % PY_VERSION)
         self.manager = manager
         self._timer = None
 

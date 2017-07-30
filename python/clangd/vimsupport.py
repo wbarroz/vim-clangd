@@ -2,13 +2,16 @@ import os
 import vim
 from clangd import glog as log
 
+from sys import version_info
+PY_VERSION = version_info[0]
+PY2 = PY_VERSION  == 2
 
 def PyVersion():
-    return int(vim.eval('g:clangd#py_version'))
+    return PY_VERSION
 
 # Given an object, returns a str object that's utf-8 encoded.
 def ToUtf8IfNeeded(value):
-    if PyVersion() < 3 and isinstance(value, unicode):
+    if PY2 and isinstance(value, unicode):
         return value.encode('utf8')
     if isinstance(value, str):
         return value
@@ -52,7 +55,7 @@ def GetBufferByName(file_name):
     return None
 
 def ExtractUTF8Text(buf):
-    if PyVersion() >= 3:
+    if not PY2:
         return '\n'.join(buf)
 
     enc = buf.options['fileencoding']

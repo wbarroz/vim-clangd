@@ -2,16 +2,21 @@ from array import array
 import fcntl
 from fcntl import ioctl
 from sys import platform as sys_platform
+from clangd.vimsupport import PY2
 try:
     from termios import FIONREAD
 except ImportError:
     # happens in cygwin or not defined
     if sys_platform == 'msys':
-        # _IOR('f', 127, u_long)
-        FIONREAD = 0x4008667fL
+        """ _IOR('f', 127, u_long) """
+        if PY2:
+            FIONREAD = long(0x4008667f)
+        else:
+            FIONREAD = 0x4008667f
     else:
         raise
 from os import pipe, read, write
+
 
 def EstimateUnreadBytes(fd):
     buf = array('i', [0])
