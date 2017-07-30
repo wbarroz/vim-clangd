@@ -134,3 +134,13 @@ class EventDispatcher(object):
             return
         self.manager.GetDiagnosticsForCurrentFile()
         self.manager.EchoErrorMessageForCurrentLine()
+
+    def OnRequestDownloadBinary(self, script_path):
+        from clangd.binary_downloader import BinaryDownloader
+        self.manager.stopServer(confirmed=True, in_shutdown=True)
+
+        downloader = BinaryDownloader()
+        downloader.downloadBinary(script_path)
+
+        self.manager._in_shutdown = False
+        self.manager.startServer(confirmed=True)

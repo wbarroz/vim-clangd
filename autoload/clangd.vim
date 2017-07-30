@@ -428,7 +428,7 @@ fu! s:Format()
 endf
 
 fu! s:DownloadBinary()
-  Python manager.downloadBinary(os.path.join(vim.eval('s:script_folder_path'), '..', 'script'))
+  Python handler.OnRequestDownloadBinary(os.path.join(vim.eval('s:script_folder_path'), '..', 'script'))
 endf
 
 fu! s:PyEval(line)

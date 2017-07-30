@@ -1,8 +1,6 @@
-import os
-from os.path import dirname, abspath, join, isfile
-from sys import platform as sys_platform
-import vim
+from os.path import dirname, abspath, join, isfile, expanduser
 from subprocess import check_output, CalledProcessError, Popen, check_call
+import vim
 
 from clangd import vimsupport
 from clangd.vimsupport import GetBoolValue, GetIntValue, GetVariableValue
@@ -10,9 +8,6 @@ from clangd.lsp_client import LSPClient, TimedOutError
 from clangd.trie import Trie
 from clangd import glog as log
 
-
-DOWNLOAD_INDEX_URL = 'https://storage.googleapis.com/vim-clangd/REV308822/clangd-download-index.json'
-DOWNLOAD_URL_PREFIX = 'https://storage.googleapis.com/vim-clangd/'
 
 def GetUriFromFilePath(file_path):
     return 'file://%s' % file_path
@@ -122,9 +117,9 @@ class ClangdManager(object):
             clangd_executable = str(GetVariableValue('g:clangd#clangd_executable'))
             if not clangd_executable:
                 vim_script_folder_path = str(GetVariableValue('s:script_folder_path'))
-                clangd_executable = os.path.join(vim_script_folder_path, '..', 'script', 'bin', 'clangd')
-            clangd_executable = os.path.expanduser(clangd_executable)
-            clangd_log_path = os.path.expanduser(
+                clangd_executable = join(vim_script_folder_path, '..', 'script', 'bin', 'clangd')
+            clangd_executable = expanduser(clangd_executable)
+            clangd_log_path = expanduser(
                 GetVariableValue('g:clangd#log_path') + '/clangd.log')
             try:
                 self._client = LSPClient(clangd_executable, clangd_log_path,
@@ -135,7 +130,9 @@ class ClangdManager(object):
                 return
             self._client.initialize()
 
-    def stopServer(self, confirmed=False):
+    def stopServer(self, confirmed=False, in_shutdown=False):
+        if in_shutdown:
+            self._in_shutdown = True
         if confirmed or vimsupport.PresentYesOrNoDialog(
                 'Should we stop clangd?'):
             try:
@@ -635,124 +632,3 @@ class ClangdManager(object):
             return
 
         self._UpdateBufferByTextEdits(buf, textedits)
-
-    def _HashCheck(self, file_path, algorithm, checksum):
-        import hashlib
-        if not algorithm in ['md5', 'sha1']:
-            return vimsupport.PresentYesOrNoDialog(
-                'failed to do %s checksum on %s, should we use this file?' %
-                (algorithm, file_path))
-        with open(file_path, 'rb') as f:
-            # osx get wrong result if not put in the same time
-            if sys_platform != 'win32':
-                os.fsync(f.fileno())
-            h = hashlib.new(algorithm)
-            while True:
-                data = f.read(4096)
-                if not data:
-                    break
-                h.update(data)
-            if checksum == h.hexdigest():
-                return True
-        return vimsupport.PresentYesOrNoDialog(
-            'failed to do %s checksum on %s, should we use this file?' %
-            (algorithm, file_path))
-
-    def _LoadDownloadIndex(self):
-        try:
-            from urllib.request import urlopen
-        except ImportError:
-            from urllib2 import urlopen
-        response = urlopen(DOWNLOAD_INDEX_URL)
-        import json
-        html = response.read()
-        data = json.loads(html.decode('utf-8'))
-        return data
-
-    def downloadBinary(self, script_path):
-        supported_platforms = self._LoadDownloadIndex()
-        plat = None
-        self._in_shutdown = True
-        self.stopServer(confirmed=True)
-
-        import platform
-        is_linux = False
-        is_win32 = False
-        is_osx   = False
-        if platform.system() == 'Linux':
-            is_linux = True
-            linux_dist = platform.dist()
-            # dist turple is like this
-            # Ubuntu, 16.04, Xenial
-            # or Debian, 8.8, ''
-            # fix for debian
-            if linux_dist[0] == 'Debian':
-                linux_dist[1] = str(int(linux_dist[1]))
-
-            platform_desc = '-'.join(linux_dist)
-        elif platform.system() == 'Darwin':
-            is_osx = True
-            v, _, _ = platform.mac_ver()
-            mac_ver = '.'.join(v.split('.')[:2])
-            platform_desc  = 'Mac OS X %s' % mac_ver
-        elif platform.system() == 'Windows':
-            is_win32 = True
-            win_ver, _, _, _ = platform.win32_ver()
-            platform_desc = 'Windows %s' % win_ver
-        else:
-            platform_desc = platform.system()
-
-        log.info('detected platform %s' % platform_desc)
-
-        for supported_platform in supported_platforms:
-            if supported_platform['system'] == platform.system():
-                if is_linux:
-                    if supported_platform['dist'][0] != linux_dist[0] or supported_platform['dist'][1] != linux_dist[1] or supported_platform['dist'][2] != linux_dist[2]:
-                        continue
-                elif is_osx:
-                    if float(mac_ver) < float(supported_platform['mac_ver']):
-                        continue
-                elif is_win32:
-                    if float(win_ver) < float(supported_platform['win_ver']):
-                        continue
-                plat = supported_platform
-                break
-        if not plat:
-            vimsupport.EchoMessage('non supported platform %s' % platform_desc)
-            return
-        if not plat['url'].startswith(DOWNLOAD_URL_PREFIX):
-            vimsupport.EchoMessage('broken clangd %s' % plat['url'])
-            return
-
-        log.warn('downloading clangd binary from url %s' % plat['url'])
-
-        try:
-            from urllib.request import urlretrieve
-        except ImportError:
-            from urllib import urlretrieve
-        tarball_file, _ = urlretrieve(plat['url'])
-
-        if not self._HashCheck(tarball_file, 'md5', plat['md5sum']):
-            vimsupport.EchoMessage('bad checksum clangd binary for platform %s' % platform_desc)
-            return
-        log.warn('downloaded clangd binary for platform %s' % platform_desc)
-
-        for dir_name in ['bin', 'lib']:
-            dir_path = os.path.join(script_path, dir_name)
-            if os.path.exists(dir_path):
-                from shutil import rmtree
-                rmtree(dir_path)
-        if is_win32:
-            import tarfile
-            tar = tarfile.open(name=tarball_file, mode='r:gz')
-            tar.extractall(path=script_path)
-        else:
-            check_call(['tar', '-C', script_path, '-xf', tarball_file])
-        try:
-            os.unlink(tarball_file)
-        except OSError:
-            pass
-        vimsupport.EchoMessage('clangd installed')
-
-        self._in_shutdown = False
-        self.startServer(confirmed=True)
