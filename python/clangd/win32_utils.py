@@ -13,6 +13,7 @@ from ctypes import sizeof as c_sizeof
 
 from struct import unpack, pack
 
+import os
 import socket
 
 from msvcrt import open_osfhandle
