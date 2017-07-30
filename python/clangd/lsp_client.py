@@ -8,10 +8,9 @@ from clangd.jsonrpc import JsonRPCClient, TimedOutError
 
 # platform-specific stuff
 if sys_platform == 'win32':
-    from clangd.win32_utils import win32_socketpair
+    from clangd.win32_utils import Win32SocketPair
 else:
-    from os import pipe
-    import fcntl
+    from clangd.posix_utils import SetCloseOnExec, Pipe
 
 Initialize_REQUEST = 'initialize'
 Shutdown_REQUEST = 'shutdown'
@@ -45,14 +44,14 @@ def StartProcess(executable_name, clangd_log_path=None):
     # apply platform-specific hacks
     if sys_platform != 'win32':
         # for posix or cygwin
-        fdInRead, fdInWrite = pipe()
-        fdOutRead, fdOutWrite = pipe()
-        fcntl.fcntl(fdInWrite, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
-        fcntl.fcntl(fdOutRead, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
+        fdInRead, fdInWrite = Pipe()
+        fdOutRead, fdOutWrite = Pipe()
+        SetCloseOnExec(fdInWrite)
+        SetCloseOnExec(fdOutRead)
     else:
         # only native win32
-        fdInRead, fdInWrite = win32_socketpair()
-        fdOutRead, fdOutWrite = win32_socketpair()
+        fdInRead, fdInWrite = Win32SocketPair()
+        fdOutRead, fdOutWrite = Win32SocketPair()
     cwd = os.path.dirname(executable_name)
     # apply native win32's hack
     if sys_platform == 'win32':

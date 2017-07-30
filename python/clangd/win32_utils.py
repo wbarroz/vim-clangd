@@ -263,10 +263,18 @@ def _ioctlsocket(s, cmd, arg=0):
     low_ioctlsocket(s, cmd, byref(ul_arg))
     return unpack('<L', ul_arg)[0]
 
+
 class WinSocket(object):
-    def __init__(self, handle = None):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+    def __init__(self, handle=None):
         if not handle:
-            handle = WSASocket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
+            handle = WSASocket(socket.AF_INET, socket.SOCK_STREAM,
+                               socket.IPPROTO_TCP)
         self._file_handle = handle
         self._file_no = open_osfhandle(self._file_handle, 0)
 
@@ -295,18 +303,56 @@ class WinSocket(object):
     def getsockname(self):
         return _getsockname(self._file_handle)
 
-# tcp-emulated socketpair
-def win32_socketpair():
+
+# tcp-emulated socketpair, might fail
+def Win32SocketPair():
     localhost = '127.0.0.1'
-    listener = WinSocket()
-    listener.bind((localhost, 0))
-    listener.listen(1)
-    addr = listener.getsockname()
-    client = WinSocket()
-    client.connect(addr)
-    server, server_addr = listener.accept()
-    client_addr = client.getsockname()
-    if server_addr != client_addr:
-        raise OSError('win32 socketpair failure')
-    listener.close()
+    with WinSocket() as listener:
+        listener.bind((localhost, 0))
+        listener.listen(1)
+        addr = listener.getsockname()
+        client = WinSocket()
+        client.connect(addr)
+        server, server_addr = listener.accept()
+        client_addr = client.getsockname()
+        if server_addr != client_addr:
+            client.close()
+            server.close()
+            raise OSError('win32 socketpair failure')
     return server, client
+
+
+def SetNonBlock(winsocket, enabled=True):
+    int_enabled = int(enabled)
+    _ioctlsocket(winsocket.filehandle(), FIONBIO, int_enabled)
+
+
+def EstimateUnreadBytes(winsocket):
+    return int(_ioctlsocket(winsocket.filehandle(), FIONREAD))
+
+
+def WriteUtf8(winsocket, data):
+    msg = data.encode('utf-8')
+    fd = winsocket.fileno()
+    while len(msg):
+        try:
+            written = os.write(fd, msg)
+            msg = msg[written:]
+        except OSError as e:
+            if e.errno != EINTR:
+                raise
+    return msg
+
+
+def ReadUtf8(winsocket, length):
+    msg = bytes()
+    fd = winsocket.fileno()
+    while length:
+        try:
+            buf = os.read(fd, length)
+            length -= len(buf)
+            msg += buf
+        except OSError as e:
+            if e.errno != EINTR:
+                raise
+    return msg.decode('utf-8')

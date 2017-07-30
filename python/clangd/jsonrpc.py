@@ -18,7 +18,6 @@ from clangd import glog as log
 from threading import Thread
 from errno import EINTR
 from time import sleep
-from array import array
 # try to keep compatibily with old 2.7
 try:
     import queue
@@ -28,53 +27,16 @@ except ImportError:
 # platform specific
 if sys_platform == 'win32':
     from clangd.poller import Win32Poller as Poller
-    from clangd.win32_utils import _ioctlsocket, FIONREAD, FIONBIO
+    from clangd.win32_utils import SetNonBlock, EstimateUnreadBytes, WriteUtf8, ReadUtf8
 else:
     from clangd.poller import PosixPoller as Poller
-    from fcntl import ioctl
-    from termios import FIONREAD
+    from clangd.posix_utils import EstimateUnreadBytes, WriteUtf8, ReadUtf8
 
 DEFAULT_TIMEOUT_MS = 1000
 IDLE_INTERVAL_MS = 25
 
 class TimedOutError(OSError):
     pass
-
-def EstimateUnreadBytes(fd):
-    if sys_platform == 'win32':
-        return int(_ioctlsocket(fd.filehandle(), FIONREAD))
-    else:
-        buf = array('i', [0])
-        ioctl(fd, FIONREAD, buf, 1)
-        return buf[0]
-
-def write_utf8(fd, data):
-    msg = data.encode('utf-8')
-    if sys_platform == 'win32':
-        fd = fd.fileno()
-    while len(msg):
-        try:
-            written = os.write(fd, msg)
-            msg = msg[written:]
-        except OSError as e:
-            if e.errno != EINTR:
-                raise
-    return msg
-
-
-def read_utf8(fd, length):
-    msg = bytes()
-    if sys_platform == 'win32':
-        fd = fd.fileno()
-    while length:
-        try:
-            buf = os.read(fd, length)
-            length -= len(buf)
-            msg += buf
-        except OSError as e:
-            if e.errno != EINTR:
-                raise
-    return msg.decode('utf-8')
 
 
 class JsonRPCClientThread(Thread):
@@ -86,8 +48,8 @@ class JsonRPCClientThread(Thread):
         self._read_queue = read_queue
         self._write_queue = write_queue
         if sys_platform == 'win32':
-            _ioctlsocket(input_fd.filehandle(), FIONBIO, 1)
-            _ioctlsocket(output_fd.filehandle(), FIONBIO, 1)
+            SetNonBlock(input_fd)
+            SetNonBlock(output_fd)
         self._poller = Poller([self._output_fd], [])
 
     def shutdown(self):
@@ -96,20 +58,20 @@ class JsonRPCClientThread(Thread):
 
     def _SendMsg(self, r):
         request = json.dumps(r, separators=(',', ':'), sort_keys=True)
-        write_utf8(self._input_fd,
+        WriteUtf8(self._input_fd,
                    u'Content-Length: %d\r\n\r\n' % len(request))
-        write_utf8(self._input_fd, request)
+        WriteUtf8(self._input_fd, request)
 
     def _RecvMsgHeader(self):
-        read_utf8(self._output_fd, len('Content-Length: '))
+        ReadUtf8(self._output_fd, len('Content-Length: '))
         msg = u''
-        msg += read_utf8(self._output_fd, 4)
+        msg += ReadUtf8(self._output_fd, 4)
         while True:
             if msg.endswith('\r\n\r\n'):
                 break
             if len(msg) >= 23:  # sys.maxint + 4
                 raise OSError('bad protocol')
-            msg += read_utf8(self._output_fd, 1)
+            msg += ReadUtf8(self._output_fd, 1)
 
         msg = msg[:-4]
         length = int(msg)
@@ -117,7 +79,7 @@ class JsonRPCClientThread(Thread):
 
     def _RecvMsg(self):
         msg_length = self._RecvMsgHeader()
-        msg = read_utf8(self._output_fd, msg_length)
+        msg = ReadUtf8(self._output_fd, msg_length)
 
         rr = json.loads(msg)
         return rr
