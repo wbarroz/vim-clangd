@@ -16,7 +16,6 @@ import os
 from sys import platform as sys_platform
 from clangd import glog as log
 from threading import Thread
-from errno import EINTR
 from time import sleep
 # try to keep compatibily with old 2.7
 try:

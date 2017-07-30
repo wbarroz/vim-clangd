@@ -2,6 +2,7 @@ from array import array
 import fcntl
 from fcntl import ioctl
 from sys import platform as sys_platform
+from errno import EINTR
 from clangd.vimsupport import PY2
 try:
     from termios import FIONREAD

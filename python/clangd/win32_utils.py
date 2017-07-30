@@ -10,11 +10,11 @@ from ctypes.wintypes import HANDLE, ULONG, DWORD, BOOL, LPCSTR,\
                             LPCWSTR, UINT
 
 from ctypes import sizeof as c_sizeof
-
 from struct import unpack, pack
 
 import os
 import socket
+from errno import EINTR
 
 from msvcrt import open_osfhandle
 
