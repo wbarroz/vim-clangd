@@ -28,7 +28,7 @@ except ImportError:
 # platform specific
 if sys_platform == 'win32':
     from clangd.poller import Win32Poller as Poller
-    from clangd.iocp import _ioctlsocket, FIONREAD, FIONBIO
+    from clangd.win32_utils import _ioctlsocket, FIONREAD, FIONBIO
 else:
     from clangd.poller import PosixPoller as Poller
     from fcntl import ioctl

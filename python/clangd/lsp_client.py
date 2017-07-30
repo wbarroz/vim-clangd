@@ -6,6 +6,13 @@ from subprocess import check_output, CalledProcessError, Popen
 from clangd import glog as log
 from clangd.jsonrpc import JsonRPCClient, TimedOutError
 
+# platform-specific stuff
+if sys_platform == 'win32':
+    from clangd.win32_utils import win32_socketpair
+else:
+    from os import pipe
+    import fcntl
+
 Initialize_REQUEST = 'initialize'
 Shutdown_REQUEST = 'shutdown'
 Exit_NOTIFICATION = 'exit'
@@ -26,63 +33,6 @@ PublishDiagnostics_NOTIFICATION = 'textDocument/publishDiagnostics'
 MAX_CLIENT_ERRORS = 100
 MAX_CLIENT_TIMEOUTS = 5000
 
-class WinSocket(object):
-    def __init__(self, handle = None):
-        import socket
-        from clangd.iocp import WSASocket
-        from msvcrt import open_osfhandle
-        if not handle:
-            handle = WSASocket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
-        self._file_handle = handle
-        self._file_no = open_osfhandle(self._file_handle, 0)
-
-    def close(self):
-        from clangd.iocp import CloseHandle
-        CloseHandle(self._file_handle)
-
-    def fileno(self):
-        return self._file_no
-
-    def filehandle(self):
-        return self._file_handle
-
-    def bind(self, addr):
-        from clangd.iocp import _bind
-        _bind(self._file_handle, addr)
-
-    def listen(self, backlog):
-        from clangd.iocp import _listen
-        _listen(self._file_handle, backlog)
-
-    def accept(self):
-        from clangd.iocp import WSAAccept
-        s, addr = WSAAccept(self._file_handle)
-        return WinSocket(s), addr
-
-    def connect(self, addr):
-        from clangd.iocp import WSAConnect
-        WSAConnect(self._file_handle, addr)
-
-    def getsockname(self):
-        from clangd.iocp import _getsockname
-        return _getsockname(self._file_handle)
-
-# tcp-emulated socketpair
-def win32_socketpair():
-    localhost = '127.0.0.1'
-    listener = WinSocket()
-    listener.bind((localhost, 0))
-    listener.listen(1)
-    addr = listener.getsockname()
-    client = WinSocket()
-    client.connect(addr)
-    server, server_addr = listener.accept()
-    client_addr = client.getsockname()
-    if server_addr != client_addr:
-        raise OSError('win32 socketpair failure')
-    listener.close()
-    return server, client
-
 def StartProcess(executable_name, clangd_log_path=None):
     if not clangd_log_path or not log.logger.isEnabledFor(log.DEBUG):
         clangd_log_path = os.devnull
@@ -95,8 +45,6 @@ def StartProcess(executable_name, clangd_log_path=None):
     # apply platform-specific hacks
     if sys_platform != 'win32':
         # for posix or cygwin
-        from os import pipe
-        import fcntl
         fdInRead, fdInWrite = pipe()
         fdOutRead, fdOutWrite = pipe()
         fcntl.fcntl(fdInWrite, fcntl.F_SETFD, fcntl.FD_CLOEXEC)

@@ -15,6 +15,8 @@ from struct import unpack, pack
 
 import socket
 
+from msvcrt import open_osfhandle
+
 try:
     from ctypes import WinError
 except ImportError:
@@ -260,3 +262,51 @@ def _ioctlsocket(s, cmd, arg=0):
     ul_arg = c_ulong(arg)
     low_ioctlsocket(s, cmd, byref(ul_arg))
     return unpack('<L', ul_arg)[0]
+
+class WinSocket(object):
+    def __init__(self, handle = None):
+        if not handle:
+            handle = WSASocket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
+        self._file_handle = handle
+        self._file_no = open_osfhandle(self._file_handle, 0)
+
+    def close(self):
+        CloseHandle(self._file_handle)
+
+    def fileno(self):
+        return self._file_no
+
+    def filehandle(self):
+        return self._file_handle
+
+    def bind(self, addr):
+        _bind(self._file_handle, addr)
+
+    def listen(self, backlog):
+        _listen(self._file_handle, backlog)
+
+    def accept(self):
+        s, addr = WSAAccept(self._file_handle)
+        return WinSocket(s), addr
+
+    def connect(self, addr):
+        WSAConnect(self._file_handle, addr)
+
+    def getsockname(self):
+        return _getsockname(self._file_handle)
+
+# tcp-emulated socketpair
+def win32_socketpair():
+    localhost = '127.0.0.1'
+    listener = WinSocket()
+    listener.bind((localhost, 0))
+    listener.listen(1)
+    addr = listener.getsockname()
+    client = WinSocket()
+    client.connect(addr)
+    server, server_addr = listener.accept()
+    client_addr = client.getsockname()
+    if server_addr != client_addr:
+        raise OSError('win32 socketpair failure')
+    listener.close()
+    return server, client
