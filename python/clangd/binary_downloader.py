@@ -31,8 +31,9 @@ class BinaryDownloader(object):
                 'failed to do %s checksum on %s, should we use this file?' %
                 (algorithm, file_path))
         with open(file_path, 'rb') as f:
+            # FIXME is it necessary?
             # osx get wrong result if not put in the same time
-            if sys_platform != 'win32':
+            if sys_platform != 'msys' and sys_platform != 'win32':
                 os.fsync(f.fileno())
             h = hashlib.new(algorithm)
             while True:
@@ -59,7 +60,8 @@ class BinaryDownloader(object):
         is_linux = False
         is_win32 = False
         is_osx   = False
-        if platform.system() == 'Linux':
+        platform_system = platform.system()
+        if platform_system == 'Linux':
             is_linux = True
             linux_dist = platform.dist()
             # dist turple is like this
@@ -70,22 +72,28 @@ class BinaryDownloader(object):
                 linux_dist[1] = str(int(linux_dist[1]))
 
             platform_desc = '-'.join(linux_dist)
-        elif platform.system() == 'Darwin':
+        elif platform_system == 'Darwin':
             is_osx = True
             v, _, _ = platform.mac_ver()
             mac_ver = '.'.join(v.split('.')[:2])
             platform_desc  = 'Mac OS X %s' % mac_ver
-        elif platform.system() == 'Windows':
+        elif platform_system == 'Windows':
             is_win32 = True
             win_ver, _, _, _ = platform.win32_ver()
             platform_desc = 'Windows %s' % win_ver
+        elif platform_system.startswith('MINGW64_NT'):
+            # use msvc binary temporarily
+            win_ver = float(platform_system.split('-')[1])
+            is_win32 = True
+            platform_system = 'Windows'
+            platform_desc = 'Windows %s' % win_ver
         else:
-            platform_desc = platform.system()
+            platform_desc = platform_system
 
         log.info('detected platform %s' % platform_desc)
 
         for supported_platform in supported_platforms:
-            if supported_platform['system'] == platform.system():
+            if supported_platform['system'] == platform_system:
                 if is_linux:
                     if supported_platform['dist'][0] != linux_dist[0] or supported_platform['dist'][1] != linux_dist[1] or supported_platform['dist'][2] != linux_dist[2]:
                         continue

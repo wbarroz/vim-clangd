@@ -1,7 +1,16 @@
 from array import array
 import fcntl
 from fcntl import ioctl
-from termios import FIONREAD
+from sys import platform as sys_platform
+try:
+    from termios import FIONREAD
+except ImportError:
+    # happens in cygwin or not defined
+    if sys_platform == 'msys':
+        # _IOR('f', 127, u_long)
+        FIONREAD = 0x4008667fL
+    else:
+        raise
 from os import pipe, read, write
 
 def EstimateUnreadBytes(fd):

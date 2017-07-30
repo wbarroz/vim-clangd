@@ -38,8 +38,9 @@ def StartProcess(executable_name, clangd_log_path=None):
     fdClangd = open(clangd_log_path, 'w+')
 
     # fix executable file name under windows (both cygwin and native win32)
-    if os.name == 'nt' and not executable_name.endswith('.exe'):
-        executable_name += '.exe'
+    if sys_platform == 'msys' or sys_platform == 'win32':
+        if not executable_name.endswith('.exe'):
+            executable_name += '.exe'
 
     # apply platform-specific hacks
     if sys_platform != 'win32':
