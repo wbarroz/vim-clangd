@@ -1,14 +1,15 @@
-#!/usr/bin/env python
-
-import clangd.vimsupport as vimsupport
+import os
+from os.path import dirname, abspath, join, isfile
+from sys import platform as sys_platform
 import vim
+from subprocess import check_output, CalledProcessError, Popen, check_call
+
+from clangd import vimsupport
+from clangd.vimsupport import GetBoolValue, GetIntValue, GetVariableValue
 from clangd.lsp_client import LSPClient, TimedOutError
 from clangd.trie import Trie
+from clangd import glog as log
 
-import clangd.glog as log
-import os, sys
-from os.path import dirname, abspath, join, isfile
-from subprocess import check_output, CalledProcessError, Popen, check_call
 
 DOWNLOAD_INDEX_URL = 'https://storage.googleapis.com/vim-clangd/REV308822/clangd-download-index.json'
 DOWNLOAD_URL_PREFIX = 'https://storage.googleapis.com/vim-clangd/'
@@ -86,14 +87,14 @@ def CompletionItemKind(kind):
     return ''
 
 
-class ClangdManager():
+class ClangdManager(object):
     def __init__(self):
         self.lined_diagnostics = {}
         self.state = {}
         self._client = None
         self._in_shutdown = False
         self._documents = {}
-        autostart = bool(vim.eval('g:clangd#autostart'))
+        autostart = GetBoolValue('g:clangd#autostart')
         if autostart:
             self.startServer(confirmed=True)
         self._ClearLastCompletions()
@@ -118,13 +119,13 @@ class ClangdManager():
             return
         if confirmed or vimsupport.PresentYesOrNoDialog(
                 'Should we start clangd?'):
-            clangd_executable = str(vim.eval('g:clangd#clangd_executable'))
+            clangd_executable = str(GetVariableValue('g:clangd#clangd_executable'))
             if not clangd_executable:
-                vim_script_folder_path = vim.eval('s:script_folder_path')
+                vim_script_folder_path = str(GetVariableValue('s:script_folder_path'))
                 clangd_executable = os.path.join(vim_script_folder_path, '..', 'script', 'bin', 'clangd')
             clangd_executable = os.path.expanduser(clangd_executable)
             clangd_log_path = os.path.expanduser(
-                vim.eval('g:clangd#log_path') + '/clangd.log')
+                GetVariableValue('g:clangd#log_path') + '/clangd.log')
             try:
                 self._client = LSPClient(clangd_executable, clangd_log_path,
                                          self)
@@ -167,7 +168,7 @@ class ClangdManager():
 
         if not self._in_shutdown:
             self.stopServer(confirmed=True)
-            if bool(vim.eval('g:clangd#restart_after_crash')):
+            if GetBoolValue('g:clangd#restart_after_crash'):
                 self.startServer(confirmed=True)
 
     def on_bad_message_received(self, wc, message):
@@ -471,7 +472,7 @@ class ClangdManager():
             return -1
 
         if not self._last_completions_pos == (line - 1, start_column):
-            timeout_ms = int(vim.eval('g:clangd#codecomplete_timeout'))
+            timeout_ms = GetIntValue('g:clangd#codecomplete_timeout')
             try:
                 self._last_completions_pos = (line - 1, start_column)
                 uri = GetUriFromFilePath(vimsupport.CurrentBufferFileName())
@@ -643,7 +644,7 @@ class ClangdManager():
                 (algorithm, file_path))
         with open(file_path, 'rb') as f:
             # osx get wrong result if not put in the same time
-            if sys.platform != 'win32':
+            if sys_platform != 'win32':
                 os.fsync(f.fileno())
             h = hashlib.new(algorithm)
             while True:

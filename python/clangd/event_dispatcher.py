@@ -1,12 +1,9 @@
-#!/usr/bin/env python
-import clangd.glog as log
-import clangd.vimsupport as vimsupport
-import vim
-
 from time import time
+from clangd import glog as log
+from clangd.vimsupport import GetBoolValue, PyVersion, EchoText, CurrentFileTypes
 
 
-class EmulateTimer:
+class EmulateTimer(object):
     def __init__(self, observer, interval=5):
         self._interval = interval
         self._observer = observer
@@ -26,16 +23,16 @@ class EmulateTimer:
             self._observer.OnTimerCallback()
 
 
-class EventDispatcher:
+class EventDispatcher(object):
     def __init__(self, manager):
-        log.info('using python %d' % vimsupport.PyVersion())
+        log.info('using python %d' % PyVersion())
         self.manager = manager
         self._timer = None
 
     def _LazyInit(self):
         native_timer = False
         try:
-            native_timer = bool(vim.eval('has("s:timer")'))
+            native_timer = GetBoolValue('has("s:timer")')
         except:
             log.exception('native timer')
         if native_timer:
@@ -45,9 +42,9 @@ class EventDispatcher:
             self._timer = EmulateTimer(self)
 
     def OnVimEnter(self):
-        autostart = bool(vim.eval('g:clangd#autostart'))
+        autostart = GetBoolValue('g:clangd#autostart')
         if autostart and not self.manager.isAlive():
-            vimsupport.EchoText('vim-clanged is not running')
+            EchoText('vim-clanged is not running')
             return
 
         self._LazyInit()
@@ -79,7 +76,7 @@ class EventDispatcher:
 
     def OnFileType(self):
         log.info('Current FileType Changed To %s' %
-                 vimsupport.CurrentFileTypes()[0])
+                 CurrentFileTypes()[0])
         if self._timer:
             self._timer.poll()
         self.manager.CloseCurrentFile()

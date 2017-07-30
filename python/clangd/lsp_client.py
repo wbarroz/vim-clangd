@@ -1,9 +1,10 @@
 # LSP Client
 # https://github.com/Microsoft/language-server-protocol/blob/master/protocol.md
-from clangd.jsonrpc import JsonRPCClient, TimedOutError
+import os
+from sys import platform as sys_platform
 from subprocess import check_output, CalledProcessError, Popen
-import clangd.glog as log
-import os, sys
+from clangd import glog as log
+from clangd.jsonrpc import JsonRPCClient, TimedOutError
 
 Initialize_REQUEST = 'initialize'
 Shutdown_REQUEST = 'shutdown'
@@ -92,7 +93,7 @@ def StartProcess(executable_name, clangd_log_path=None):
         executable_name += '.exe'
 
     # apply platform-specific hacks
-    if sys.platform != 'win32':
+    if sys_platform != 'win32':
         # for posix or cygwin
         from os import pipe
         import fcntl
@@ -106,7 +107,7 @@ def StartProcess(executable_name, clangd_log_path=None):
         fdOutRead, fdOutWrite = win32_socketpair()
     cwd = os.path.dirname(executable_name)
     # apply native win32's hack
-    if sys.platform == 'win32':
+    if sys_platform == 'win32':
         # we need hide this subprocess's window under windows, or it opens a new visible window
         import subprocess
         startupinfo = subprocess.STARTUPINFO()
@@ -131,7 +132,7 @@ def StartProcess(executable_name, clangd_log_path=None):
     return clangd, fdInWrite, fdOutRead, fdClangd
 
 
-class LSPClient():
+class LSPClient(object):
     def __init__(self, clangd_executable, clangd_log_path, manager):
         clangd, fdRead, fdWrite, fdClangd = StartProcess(
             clangd_executable, clangd_log_path)
@@ -153,7 +154,7 @@ class LSPClient():
             self._clangd.kill()
         log.info('clangd stopped, pid %d' % self._clangd.pid)
         self._clangd_logfd.close()
-        if sys.platform == 'win32':
+        if sys_platform == 'win32':
             # only native win32
             self._input_fd.close()
             self._output_fd.close()

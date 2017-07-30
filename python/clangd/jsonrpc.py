@@ -11,8 +11,10 @@
 #               }
 #               }
 #
-import json, os, sys
-import clangd.glog as log
+import json
+import os
+from sys import platform as sys_platform
+from clangd import glog as log
 from clangd.vimsupport import PyVersion
 from threading import Thread
 from errno import EINTR
@@ -71,7 +73,7 @@ class TimedOutError(OSError):
 def EstimateUnreadBytes(fd):
     from array import array
 
-    if sys.platform == 'win32':
+    if sys_platform == 'win32':
         from clangd.iocp import _ioctlsocket, FIONREAD
         return int(_ioctlsocket(fd.filehandle(), FIONREAD))
     else:
@@ -84,7 +86,7 @@ def EstimateUnreadBytes(fd):
 
 def write_utf8(fd, data):
     msg = data.encode('utf-8')
-    if sys.platform == 'win32':
+    if sys_platform == 'win32':
         fd = fd.fileno()
     while len(msg):
         try:
@@ -98,7 +100,7 @@ def write_utf8(fd, data):
 
 def read_utf8(fd, length):
     msg = bytes()
-    if sys.platform == 'win32':
+    if sys_platform == 'win32':
         fd = fd.fileno()
     while length:
         try:
@@ -119,7 +121,7 @@ class JsonRPCClientThread(Thread):
         self._output_fd = output_fd
         self._read_queue = read_queue
         self._write_queue = write_queue
-        if sys.platform == 'win32':
+        if sys_platform == 'win32':
             from clangd.iocp import _ioctlsocket, FIONBIO
             _ioctlsocket(input_fd.filehandle(), FIONBIO, 1)
             _ioctlsocket(output_fd.filehandle(), FIONBIO, 1)
@@ -216,7 +218,7 @@ class JsonRPCClientThread(Thread):
             if long_idle < 100:
                 long_idle += 1
 
-class JsonRPCClient:
+class JsonRPCClient(object):
     def __init__(self, request_observer, input_fd, output_fd):
         self._no = 0
         self._requests = {}

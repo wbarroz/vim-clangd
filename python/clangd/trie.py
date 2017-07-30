@@ -1,14 +1,14 @@
 TRIE_NODE_SIZE = ord('~') - ord(' ') + 1
 
 
-class TrieNode:
+class TrieNode(object):
     def __init__(self):
         self._children = [None] * TRIE_NODE_SIZE
         self._is_leaf = False
         self._leaf_data = []
 
 
-class Trie:
+class Trie(object):
     def __init__(self):
         self.root = self.getNode()
 

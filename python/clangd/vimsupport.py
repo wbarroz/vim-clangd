@@ -1,11 +1,10 @@
-#!/usr/bin/env python
-import vim
 import os
-import clangd.glog as log
+import vim
+from clangd import glog as log
 
 
 def PyVersion():
-  return int(vim.eval('g:clangd#py_version'))
+    return int(vim.eval('g:clangd#py_version'))
 
 # Given an object, returns a str object that's utf-8 encoded.
 def ToUtf8IfNeeded(value):
