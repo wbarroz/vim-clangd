@@ -30,11 +30,7 @@ class EventDispatcher(object):
         self._timer = None
 
     def _LazyInit(self):
-        native_timer = False
-        try:
-            native_timer = GetBoolValue('has("s:timer")')
-        except:
-            log.exception('native timer')
+        native_timer = GetBoolValue('has("s:timer")')
         if native_timer:
             log.info('vim native timer found and used')
             # FIXME use abstract timer
@@ -52,7 +48,7 @@ class EventDispatcher(object):
         if self._timer:
             self._timer.start()
 
-        log.info('vim-clangd plugin fully loaded')
+        log.warn('vim-clangd plugin fully loaded')
 
     def OnVimLeave(self):
         log.debug('VimLeave')
@@ -62,12 +58,16 @@ class EventDispatcher(object):
         try:
             # BufUnload won't be called at exit, you need to call it yourself
             self.manager.CloseAllFiles()
-            log.info('vim-clangd closed all files')
+            log.warn('vim-clangd closed all files')
+        except TimedOutError:
+            # safe to ignore
+            log.exception("close all files refused")
+
+        try:
             self.manager.stopServer(confirmed=True)
-            log.info('vim-clangd stopped server')
-        except:
-            log.exception("vim-clangd plugin unload with error")
-        log.info('vim-clangd plugin fully unloaded')
+        except OSError:
+            log.exception("clangd refused to shutdown")
+        log.warn('vim-clangd plugin fully unloaded')
 
     def OnBufferReadPost(self, file_name):
         if self._timer:

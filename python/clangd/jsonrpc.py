@@ -92,7 +92,7 @@ class JsonRPCClientThread(Thread):
         try:
             self._Run()
         except:
-            log.exception('failed io thread')
+            log.exception('fatal error, io thread')
         self.shutdown()
 
     def _Run(self):

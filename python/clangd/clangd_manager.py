@@ -124,7 +124,7 @@ class ClangdManager(object):
             try:
                 self._client = LSPClient(clangd_executable, clangd_log_path,
                                          self)
-            except:
+            except OSError:
                 log.exception('failed to start clangd')
                 vimsupport.EchoMessage('failed to start clangd executable')
                 return
@@ -138,10 +138,10 @@ class ClangdManager(object):
             try:
                 if self._client:
                     client = self._client
-                    self._client = None
                     client.shutdown()
                     client.exit()
-            except:
+                    self._client = None
+            except OSError:
                 log.exception('failed to stop clangd')
                 return
 
@@ -197,7 +197,7 @@ class ClangdManager(object):
         try:
             buf = vimsupport.GetBufferByName(file_name)
             self.didOpenFile(buf)
-        except:
+        except TimedOutError:
             log.exception('failed to open %s' % file_name)
             vimsupport.EchoTruncatedText('unable to open %s' % file_name)
             return False
@@ -219,7 +219,7 @@ class ClangdManager(object):
         uri = GetUriFromFilePath(file_name)
         try:
             self._client.didSaveTestDocument(uri)
-        except:
+        except TimedOutError:
             log.exception('unable to save %s' % file_name)
             return False
         log.info('file %s saved' % file_name)
@@ -241,7 +241,7 @@ class ClangdManager(object):
         version = self._documents.pop(uri)['version']
         try:
             self._client.didCloseTestDocument(uri)
-        except:
+        except TimedOutError:
             log.exception('failed to close file %s' % file_name)
             return False
         log.info('file %s closed' % file_name)
@@ -274,7 +274,7 @@ class ClangdManager(object):
             return []
         try:
             self._client.handleClientRequests()
-        except:
+        except TimedOutError:
             log.exception('failed to get diagnostics %s' % file_name)
             return []
         if not uri in self._documents or not 'diagnostics' in self._documents[uri]:
@@ -399,7 +399,7 @@ class ClangdManager(object):
         buf = vimsupport.CurrentBuffer()
         try:
             self.UpdateSpecifiedBuffer(buf)
-        except:
+        except TimedOutError:
             log.exception('failed to update curent buffer')
             vimsupport.EchoTruncatedText('unable to update curent buffer')
 
@@ -545,7 +545,7 @@ class ClangdManager(object):
         try:
             for uri in list(self._documents.keys()):
                 self._client.didCloseTestDocument(uri)
-        except OSError:
+        except TimedOutError:
             log.exception('failed to close all files')
 
     def _UpdateBufferByTextEdits(self, buf, textedits):
@@ -602,9 +602,9 @@ class ClangdManager(object):
 
             # actual format rpc
             textedits = self._client.format(uri)
-        except OSError as e:
-            vimsupport.EchoMessage("clangd refuse to perform code format")
-            log.info(e)
+        except TimedOutError:
+            vimsupport.EchoMessage('clangd refuse to perform code format')
+            log.exception('code format')
             return
 
         self._UpdateBufferByTextEdits(buf, textedits)
@@ -626,9 +626,9 @@ class ClangdManager(object):
             # actual format rpc
             textedits = self._client.rangeFormat(uri, start_line - 1, start_column,
                                                  end_line - 1, end_column)
-        except OSError as e:
+        except TimedOutError:
             vimsupport.EchoMessage("clangd refuse to perform code format")
-            log.info(e)
+            log.exception('code format')
             return
 
         self._UpdateBufferByTextEdits(buf, textedits)
