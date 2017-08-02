@@ -38,6 +38,8 @@ def WriteUtf8(fd, data):
     while len(msg):
         try:
             written = write(fd, msg)
+            if written == 0:
+                raise OSError('broken pipe')
             msg = msg[written:]
         except OSError as e:
             if e.errno != EINTR:
@@ -50,6 +52,8 @@ def ReadUtf8(fd, length):
     while length:
         try:
             buf = read(fd, length)
+            if len(buf) == 0:
+                raise OSError('broken pipe')
             length -= len(buf)
             msg += buf
         except OSError as e:

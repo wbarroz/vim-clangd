@@ -338,6 +338,8 @@ def WriteUtf8(winsocket, data):
     while len(msg):
         try:
             written = os.write(fd, msg)
+            if written == 0:
+                raise OSError('broken pipe')
             msg = msg[written:]
         except OSError as e:
             if e.errno != EINTR:
@@ -351,6 +353,8 @@ def ReadUtf8(winsocket, length):
     while length:
         try:
             buf = os.read(fd, length)
+            if len(buf) == 0:
+                raise OSError('broken pipe')
             length -= len(buf)
             msg += buf
         except OSError as e:
