@@ -104,9 +104,8 @@ class JsonRPCClientThread(Thread):
                 except queue.Empty:
                     break
 
-                # receive shutdown notification
-                # FIXME use better class?
-                if isinstance(r, OSError):
+                # receive shutdown sentinel
+                if r == None:
                     self._is_stop = True
                     break
 
@@ -155,7 +154,8 @@ class JsonRPCClient(object):
     def stop(self):
         if self._is_stop:
             return
-        self._write_queue.put(OSError('stop'))
+        # put stop sentinel to io thread
+        self._write_queue.put(None)
         self._is_stop = True
         self._io_thread.join()
 
@@ -180,9 +180,9 @@ class JsonRPCClient(object):
                 sleep(IDLE_INTERVAL_MS * 0.001)
                 timeout_ms -= IDLE_INTERVAL_MS
                 continue
-            if isinstance(rr, OSError):
+            if rr == None:
                 self._observer.onServerDown()
-                raise rr
+                raise OSError('io thread stopped')
             rr = self.RecvMsg(rr)
             if 'id' in rr and rr['id'] == Id:
                 if 'error' in rr:
@@ -207,8 +207,9 @@ class JsonRPCClient(object):
                 rr = self._read_queue.get_nowait()
             except queue.Empty:
                 break
-            if isinstance(rr, OSError):
-                raise rr
+            if rr == None:
+                self._observer.onServerDown()
+                raise OSError('io thread stopped')
             self.RecvMsg(rr)
 
     def SendMsg(self, method, params={}, Id=None):
