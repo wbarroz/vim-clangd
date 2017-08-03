@@ -9,6 +9,8 @@ from clangd.trie import Trie
 from clangd import glog as log
 
 
+DEFAULT_TRIGGER_STYLE = ['.', '>']
+
 def GetUriFromFilePath(file_path):
     return 'file://%s' % file_path
 
@@ -89,6 +91,7 @@ class ClangdManager(object):
         self._client = None
         self._in_shutdown = False
         self._documents = {}
+        self._triggerCharacters = set(DEFAULT_TRIGGER_STYLE)
         autostart = GetBoolValue('g:clangd#autostart')
         if autostart:
             self.startServer(confirmed=True)
@@ -128,7 +131,10 @@ class ClangdManager(object):
                 log.exception('failed to start clangd')
                 vimsupport.EchoMessage('failed to start clangd executable')
                 return
-            self._client.initialize()
+            rr = self._client.initialize()
+            capabilities = rr['capabilities']
+            if 'completionProvider' in capabilities and 'triggerCharacters' in capabilities['completionProvider']:
+                self._triggerCharacters = set(capabilities['completionProvider']['triggerCharacters'])
 
     def stopServer(self, confirmed=False, in_shutdown=False):
         if in_shutdown:
@@ -465,7 +471,10 @@ class ClangdManager(object):
             trigger_word = vimsupport.CurrentLine()[start_column - 1]
 
         # skip from ';' and '}'
-        if trigger_word == ';' or trigger_word == '}':
+        if trigger_word == ';' or trigger_word == '}' or trigger_word == ']':
+            return -1
+
+        if not trigger_word in self._triggerCharacters:
             return -1
 
         if not self._last_completions_pos == (line - 1, start_column):
