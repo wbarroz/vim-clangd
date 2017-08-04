@@ -86,6 +86,7 @@ class BinaryDownloader(object):
 
         download_infos = self._LoadDownloadInfo()
         # try to match from a set of download infos
+        plats = []
         for plat in download_infos:
             # not trust url outside our mirror site
             if not plat['url'].startswith(DOWNLOAD_URL_PREFIX):
@@ -94,16 +95,18 @@ class BinaryDownloader(object):
                 if platform_system == 'Linux':
                     if plat['dist'][0] != linux_dist[0]:
                         continue
-                    if float(plat['dist'][1]) < float(linux_dist[1]):
-                        continue
+                    plat['version'] = float(plat['dist'][1])
                 elif platform_system == 'Darwin':
-                    if float(mac_ver) < float(plat['mac_ver']):
-                        continue
+                    plat['version'] = float(plat['mac_ver'])
                 elif platform_system == 'Windows':
-                    if float(win_ver) < float(plat['win_ver']):
-                        continue
-                return platform_desc, plat
-        return platform_desc, None
+                    plat['version'] = float(plat['win_ver'])
+                if platform_version < plat['version']:
+                    continue
+                plats.append(plat)
+        if not plats:
+            return platform_desc, None
+        plats.sort(key=lambda x : x['version'], reverse=True)
+        return platform_desc, plats[0]
 
     def downloadBinary(self, script_path):
         platform_desc, plat = self._DetectBinaryUrl()
