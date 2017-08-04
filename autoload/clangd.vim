@@ -52,6 +52,7 @@ fu! s:SetUpPython() abort
   exec s:PyUntilEOF
 import sys, os, vim
 sys.path.insert(0, os.path.join(vim.eval('s:script_folder_path'), '..', 'python'))
+from clangd.clangd_manager import FilterFileName, FilterCurrentFile
 import clangd.glog as log
 try:
   log_level = str(vim.eval('g:clangd#log_level'))
@@ -196,21 +197,21 @@ fu! s:VimLeave()
 endf
 
 fu! s:BufferRead()
-  if s:PyEval('manager.FilterCurrentFile()')
+  if s:FilterCurrentFile()
     return
   endif
   Python handler.OnBufferRead()
 endf
 
 fu! s:BufferReadPost(file_name)
-  if s:PyEval('manager.FilterFileName("'. a:file_name . '")')
+  if s:FilterFileName(a:file_name)
     return
   endif
   Python handler.OnBufferReadPost(vim.eval('a:file_name'))
 endf
 
 fu! s:FileType()
-  if s:PyEval('manager.FilterCurrentFile()')
+  if s:FilterCurrentFile()
     return
   endif
   call s:SetCompletionCallback()
@@ -218,28 +219,28 @@ fu! s:FileType()
 endf
 
 fu! s:BufferWritePost(file_name)
-  if s:PyEval('manager.FilterFileName("'. a:file_name . '")')
+  if s:FilterFileName(a:file_name)
     return
   endif
   Python handler.OnBufferWritePost(vim.eval('a:file_name'))
 endf
 
 fu! s:BufferUnload(file_name)
-  if s:PyEval('manager.FilterFileName("'. a:file_name . '")')
+  if s:FilterFileName(a:file_name)
     return
   endif
   Python handler.OnBufferUnload(vim.eval('a:file_name'))
 endf
 
 fu! s:BufferDelete(file_name)
-  if s:PyEval('manager.FilterFileName("'. a:file_name . '")')
+  if s:FilterFileName(a:file_name)
     return
   endif
   Python handler.OnBufferDelete(vim.eval('a:file_name'))
 endf
 
 fu! s:CursorMove()
-  if s:PyEval('manager.FilterCurrentFile()')
+  if s:FilterCurrentFile()
     return
   endif
   let current_position = getpos('.')
@@ -249,7 +250,7 @@ fu! s:CursorMove()
 endf
 
 fu! s:CursorMoveInsertMode()
-  if s:PyEval('manager.FilterCurrentFile()')
+  if s:FilterCurrentFile()
     return
   endif
   call s:CursorMove()
@@ -257,14 +258,14 @@ fu! s:CursorMoveInsertMode()
 endf
 
 fu! s:CursorHold()
-  if s:PyEval('manager.FilterCurrentFile()')
+  if s:FilterCurrentFile()
     return
   endif
   Python handler.OnCursorHold()
 endf
 
 fu! s:InsertEnter()
-  if s:PyEval('manager.FilterCurrentFile()')
+  if s:FilterCurrentFile()
     return
   endif
   let s:old_cursor_position = []
@@ -273,23 +274,30 @@ fu! s:InsertEnter()
 endf
 
 fu! s:InsertLeave()
-  if s:PyEval('manager.FilterCurrentFile()')
+  if s:FilterCurrentFile()
     return
   endif
   Python handler.OnInsertLeave()
 endf
 
 fu! s:TextChanged()
-  if s:PyEval('manager.FilterCurrentFile()')
+  if s:FilterCurrentFile()
     return
   endif
   Python handler.OnTextChanged()
 endf
 
 " Helpers
+fu! s:FilterCurrentFile()
+  return s:PyEval('FilterCurrentFile()')
+endf
+
+fu! s:FilterFileName(file_name)
+  return s:PyEval('FilterFileName("'. a:file_name . '")')
+endf
 
 fu! s:ShowDiagnostics()
-  if s:PyEval('manager.FilterCurrentFile()')
+  if s:FilterCurrentFile()
     return
   endif
   let diags = s:PyEval('manager.GetDiagnosticsForCurrentFile()')
@@ -303,7 +311,7 @@ fu! s:ShowDiagnostics()
 endf
 
 fu! s:ForceCompile()
-  if s:PyEval('manager.FilterCurrentFile()')
+  if s:PyEval('FilterCurrentFile()')
     return
   endif
   Python manager.ReparseCurrentFile()
@@ -316,7 +324,7 @@ fu! clangd#CodeCompleteAt(findstart, base)
     return clangd#OmniCompleteAt(a:findstart, a:base)
   endif
   if a:findstart
-    if s:PyEval('manager.FilterCurrentFile()')
+    if s:PyEval('FilterCurrentFile()')
       return -3
     endif
     if !s:cursor_moved
@@ -329,7 +337,7 @@ fu! clangd#CodeCompleteAt(findstart, base)
     return l:column - 1
   endif
 
-  if s:PyEval('manager.FilterCurrentFile()')
+  if s:PyEval('FilterCurrentFile()')
     return []
   endif
   " return completions
@@ -383,7 +391,7 @@ fu! s:SetCompletionCallback()
 endf
 
 fu! s:GotoDefinition()
-  if s:PyEval('manager.FilterCurrentFile()')
+  if s:PyEval('FilterCurrentFile()')
     echom 'unsupported file type'
     return
   endif
@@ -392,7 +400,7 @@ fu! s:GotoDefinition()
 endf
 
 fu! s:ShowDetailedDiagnostic()
-  if s:PyEval('manager.FilterCurrentFile()')
+  if s:PyEval('FilterCurrentFile()')
     echom 'unsupported file type'
     return
   endif
@@ -401,7 +409,7 @@ fu! s:ShowDetailedDiagnostic()
 endf
 
 fu! s:ShowCursorDetail()
-  if s:PyEval('manager.FilterCurrentFile()')
+  if s:PyEval('FilterCurrentFile()')
     echom 'unsupported file type'
     return
   endif
@@ -440,7 +448,7 @@ fu! s:PyEval(line)
 endf
 
 fu! ClangdStatuslineFlag()
-  if s:PyEval('manager.FilterCurrentFile()')
+  if s:PyEval('FilterCurrentFile()')
     return ''
   endif
   return s:PyEval('manager.ErrorStatusForCurrentLine()')

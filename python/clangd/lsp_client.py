@@ -1,6 +1,7 @@
 # LSP Client
 # https://github.com/Microsoft/language-server-protocol/blob/master/protocol.md
 import os
+import subprocess
 from sys import platform as sys_platform
 from subprocess import check_output, CalledProcessError, Popen
 from clangd import glog as log
@@ -57,7 +58,6 @@ def StartProcess(executable_name, clangd_log_path=None):
     # apply native win32's hack
     if sys_platform == 'win32':
         # we need hide this subprocess's window under windows, or it opens a new visible window
-        import subprocess
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwFlags = subprocess.STARTF_USESTDHANDLES | subprocess.STARTF_USESHOWWINDOW
         startupinfo.wShowWindow = subprocess.SW_HIDE

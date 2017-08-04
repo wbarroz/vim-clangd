@@ -90,7 +90,7 @@ class BinaryDownloader(object):
         else:
             platform_desc = platform_system
 
-        log.info('detected platform %s' % platform_desc)
+        log.warn('detected platform %s' % platform_desc)
 
         for supported_platform in supported_platforms:
             if supported_platform['system'] == platform_system:

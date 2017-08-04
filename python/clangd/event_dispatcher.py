@@ -1,6 +1,7 @@
 from time import time
 from clangd import glog as log
 from clangd.vimsupport import GetBoolValue, PY_VERSION, PY2, EchoText, CurrentFileTypes
+from clangd.clangd_manager import FilterCurrentFile
 
 
 class EmulateTimer(object):
@@ -113,12 +114,12 @@ class EventDispatcher(object):
     def OnInsertEnter(self):
         if self._timer:
             self._timer.poll()
-        log.debug('InsertEnter')
+        log.info('InsertEnter')
 
     def OnInsertLeave(self):
         if self._timer:
             self._timer.poll()
-        log.debug('InsertLeave')
+        log.info('InsertLeave')
 
     def OnTextChanged(self):
         if self._timer:
@@ -130,7 +131,7 @@ class EventDispatcher(object):
     def OnTimerCallback(self):
         log.debug('OnTimer')
         self.manager.HandleClientRequests()
-        if self.manager.FilterCurrentFile():
+        if FilterCurrentFile():
             return
         self.manager.GetDiagnosticsForCurrentFile()
         self.manager.EchoErrorMessageForCurrentLine()

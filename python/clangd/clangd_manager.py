@@ -11,6 +11,23 @@ from clangd import glog as log
 
 DEFAULT_TRIGGER_STYLE = ['.', '>']
 
+def FilterFileName(file_name):
+    for buf in vim.buffers:
+        if buf.name == file_name:
+            if buf.options['filetype'] in ['c', 'cpp', 'objc', 'objcpp']:
+                return False
+            return True
+    return True
+
+def FilterCurrentFile():
+    file_types = vimsupport.CurrentFileTypes()
+    if not file_types:
+        return True
+    for file_type in file_types:
+        if file_type in ['c', 'cpp', 'objc', 'objcpp']:
+            return False
+    return True
+
 def GetUriFromFilePath(file_path):
     return 'file://%s' % file_path
 
@@ -176,24 +193,6 @@ class ClangdManager(object):
 
     def on_bad_message_received(self, wc, message):
         log.info('observer: bad message')
-
-    def FilterFileName(self, file_name):
-        log.info('filter file %s' % file_name)
-        for buf in vim.buffers:
-            if buf.name == file_name:
-                if buf.options['filetype'] in ['c', 'cpp', 'objc', 'objcpp']:
-                    return False
-                return True
-        return True
-
-    def FilterCurrentFile(self):
-        file_types = vimsupport.CurrentFileTypes()
-        if not file_types:
-            return True
-        for file_type in file_types:
-            if file_type in ['c', 'cpp', 'objc', 'objcpp']:
-                return False
-        return True
 
     def OpenFile(self, file_name):
         if not self.isAlive():
