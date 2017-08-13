@@ -57,9 +57,8 @@ class BinaryDownloader(object):
             # Ubuntu, 16.04, Xenial
             # or Debian, 8.8, ''
             # fix for debian
-            if linux_dist[0] == 'Debian':
+            if linux_dist[0].lower() == 'debian':
                 linux_dist[1] = str(int(linux_dist[1]))
-            platform_dist = linux_dist[0]
             platform_version = float(linux_dist[1])
             platform_desc = '%s %s' % (linux_dist[0], platform_version)
         elif platform_system == 'Darwin':
@@ -93,7 +92,7 @@ class BinaryDownloader(object):
                 continue
             if plat['system'] == platform_system:
                 if platform_system == 'Linux':
-                    if plat['dist'][0] != linux_dist[0]:
+                    if plat['dist'][0].lower() != linux_dist[0].lower():
                         continue
                     plat['version'] = float(plat['dist'][1])
                 elif platform_system == 'Darwin':
