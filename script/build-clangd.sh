@@ -11,7 +11,7 @@ fetch_src() {
     if [ ! -d llvm-src ]; then
         git clone --depth=1 https://github.com/llvm-mirror/llvm llvm-src
     else
-        echo 'Use existing llvm-src'
+        echo 'Use existing llvm-src, rebasing to remote HEAD'
         pushd llvm-src
         git pull --rebase
         popd
@@ -19,7 +19,7 @@ fetch_src() {
     if [ ! -d llvm-src/tools/clang ]; then
         git clone --depth=1 https://github.com/llvm-mirror/clang llvm-src/tools/clang
     else
-        echo 'Use existing llvm-src/tools/clang'
+        echo 'Use existing llvm-src/tools/clang, rebasing to remote HEAD'
         pushd llvm-src/tools/clang
         git pull --rebase
         popd
@@ -28,7 +28,7 @@ fetch_src() {
     if [ ! -d llvm-src/tools/clang/tools/extra ]; then
         git clone --depth=1 https://github.com/llvm-mirror/clang-tools-extra llvm-src/tools/clang/tools/extra
     else
-        echo 'Use existing llvm-src/tools/clang/tools/extra'
+        echo 'Use existing llvm-src/tools/clang/tools/extra, rebasing to remote HEAD'
         pushd llvm-src/tools/clang/tools/extra
         git pull --rebase
         popd
@@ -39,10 +39,16 @@ check_prerequiresite() {
     HAS_MAKE="$(which make || :)"
     HAS_CMAKE="$(which cmake || :)"
     if [ -z "$HAS_MAKE" ]; then
-        die "failed to find make, are you have develop tools installed? "
+        die "failed to find make, please have develop tools installed."
     fi
     if [ -z "$HAS_CMAKE" ]; then
-        die "failed to find cmake, are you have develop tools installed? "
+        die "failed to find cmake, please have develop tools installed."
+    fi
+    if [ ! -z "$(which ninja || :)" -o ! -z "$(which ninja-build || :)" ]; then
+        CMAKE_ARGS="$CMAKE_ARGS -G Ninja"
+        echo 'Using Ninja Generators'
+    else
+        die "failed to find ninja, please have ninja/ninja-build installed."
     fi
 
     if [ "$(uname -s)" == "Darwin" ]; then
@@ -54,10 +60,10 @@ check_prerequiresite() {
     fi
 
     if [ -z "$HAS_COMPILER" ]; then
-        die "failed to find c compiler, are you have develop tools installed? "
+        die "failed to find c compiler, please have develop tools installed."
     fi
     if [ -z "$HAS_CXX_COMPILER" ]; then
-        die "failed to find c++ compiler, are you have develop tools installed? "
+        die "failed to find c++ compiler, please have develop tools installed."
     fi
 
     HAS_CLANG="$(which clang || :)"
@@ -77,13 +83,6 @@ check_prerequiresite() {
         else
             CXX=clang++
         fi
-    fi
-
-    if [ ! -z "$(which ninja || :)" -o ! -z "$(which ninja-build || :)" ]; then
-        CMAKE_ARGS="$CMAKE_ARGS -G Ninja"
-        echo 'Using Ninja Generators'
-    else
-        CMAKE_ARGS="$CMAKE_ARGS"
     fi
 }
 
