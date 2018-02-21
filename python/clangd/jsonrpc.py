@@ -169,7 +169,7 @@ class JsonRPCClient(object):
 
         if timeout_ms is None:
             timeout_ms = DEFAULT_TIMEOUT_MS
-        while timeout_ms > 0:
+        while timeout_ms >= IDLE_INTERVAL_MS:
             if self._is_stop:
                 self._observer.onServerDown()
                 raise OSError('client is down')

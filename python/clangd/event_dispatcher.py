@@ -26,14 +26,15 @@ class EmulateTimer(object):
 
 class EventDispatcher(object):
     def __init__(self, manager):
-        log.info('using python %d' % PY_VERSION)
+        log.debug('using python %d' % PY_VERSION)
         self.manager = manager
         self._timer = None
+        self._loaded = False
 
     def _LazyInit(self):
         native_timer = GetBoolValue('has("s:timer")')
         if native_timer:
-            log.info('vim native timer found and used')
+            log.debug('vim native timer support found and used')
             # FIXME use abstract timer
         else:
             self._timer = EmulateTimer(self)
@@ -73,11 +74,10 @@ class EventDispatcher(object):
     def OnBufferReadPost(self, file_name):
         if self._timer:
             self._timer.poll()
-        log.info('BufferReadPost %s' % file_name)
+        log.debug('BufferReadPost %s' % file_name)
 
     def OnFileType(self):
-        log.info('Current FileType Changed To %s' %
-                 CurrentFileTypes()[0])
+        log.debug('Current FileType Changed To %s' % CurrentFileTypes()[0])
         if self._timer:
             self._timer.poll()
         self.manager.CloseCurrentFile()
@@ -89,18 +89,18 @@ class EventDispatcher(object):
         if self._timer:
             self._timer.poll()
         self.manager.SaveFile(file_name)
-        log.info('BufferWritePost %s' % file_name)
+        log.debug('BufferWritePost %s' % file_name)
 
     def OnBufferUnload(self, file_name):
         if self._timer:
             self._timer.poll()
-        log.info('BufferUnload %s' % file_name)
+        log.debug('BufferUnload %s' % file_name)
         self.manager.CloseFile(file_name)
 
     def OnBufferDelete(self, file_name):
         if self._timer:
             self._timer.poll()
-        log.info('BufferDelete %s' % file_name)
+        log.debug('BufferDelete %s' % file_name)
         self.manager.CloseFile(file_name)
 
     def OnCursorMove(self):
@@ -114,12 +114,12 @@ class EventDispatcher(object):
     def OnInsertEnter(self):
         if self._timer:
             self._timer.poll()
-        log.info('InsertEnter')
+        log.debug('InsertEnter')
 
     def OnInsertLeave(self):
         if self._timer:
             self._timer.poll()
-        log.info('InsertLeave')
+        log.debug('InsertLeave')
 
     def OnTextChanged(self):
         if self._timer:

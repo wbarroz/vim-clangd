@@ -16,15 +16,15 @@ fu! clangd#Enable()
   if &diff
     return
   endif
+
+  let g:clangd#backend_loaded = 0
   call s:SetUpFirstRun()
-  "try
-    call s:SetUpPython()
-  " catch /.*/
-  "   if v:exception != ""
-  "       echoerr 'failed to initialize clangd plugin, ' v:exception
-  "       return
-  "   endif
-  " endtry
+  call s:SetUpPython()
+  if !g:clangd#backend_loaded
+      let g:clangd#autostart = 0
+      let g:clangd#completions_enabled = 0
+      return
+  endif
   call s:TurnOffSyntasticForCFamily()
   call s:SetUpSyntasticSigns()
   call s:SetUpSyntasticHl()
@@ -52,22 +52,39 @@ fu! s:SetUpPython() abort
   exec s:PyUntilEOF
 import sys, os, vim
 sys.path.insert(0, os.path.join(vim.eval('s:script_folder_path'), '..', 'python'))
-from clangd.clangd_manager import FilterFileName, FilterCurrentFile
-import clangd.glog as log
-try:
-  log_level = str(vim.eval('g:clangd#log_level'))
-  log_path = os.path.expanduser(str(vim.eval('g:clangd#log_path')))
-  if not os.path.exists(log_path):
-      os.makedirs(log_path)
-  log.init(log_level, os.path.join(log_path, 'vim-clangd.log'))
 
-  from clangd.clangd_manager import ClangdManager
-  from clangd.event_dispatcher import EventDispatcher
-  manager = ClangdManager()
-  handler = EventDispatcher(manager)
-except:
-  if log:
-    log.exception('failed to set up python')
+def SetUpLogging():
+    global log
+    import clangd.glog as log
+    try:
+      log_level = str(vim.eval('g:clangd#log_level'))
+      log_path = os.path.expanduser(str(vim.eval('g:clangd#log_path')))
+      if not os.path.exists(log_path):
+          os.makedirs(log_path)
+      log.init(log_level, os.path.join(log_path, 'vim-clangd.log'))
+    except Exception as e:
+      err = e
+      return False
+    return True
+
+def SetUpManager():
+    try:
+      global manager, handler, FilterFileName, FilterCurrentFile
+      from clangd.clangd_manager import FilterFileName, FilterCurrentFile
+      from clangd.clangd_manager import ClangdManager
+      from clangd.event_dispatcher import EventDispatcher
+      manager = ClangdManager()
+      handler = EventDispatcher(manager)
+    except Exception as e:
+      log.exception('failed to set up python')
+      err = e
+      return False
+    return True
+
+backend_loaded = SetUpLogging() and SetUpManager()
+if log:
+  log.debug('let g:clangd#backend_loaded = %d' % int(backend_loaded))
+vim.command('let g:clangd#backend_loaded = %d' % int(backend_loaded))
 
 EOF
 endf

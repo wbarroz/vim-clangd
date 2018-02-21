@@ -149,10 +149,16 @@ class LSPClient(object):
         except TimedOutError as e:
             log.exception('initialize timedout')
             # ignore timedout
-            rr = {'capabilities': ''}
+            rr = {}
             pass
-        log.info('clangd connected with piped fd')
-        log.info('clangd capabilities: %s' % rr['capabilities'])
+        if not 'capabilities' in rr:
+            rr['capabilities'] = {}
+        log.debug('clangd connected with backend server')
+        log.debug('clangd capabilities: %s' % rr['capabilities'])
+        for k in rr['capabilities']:
+            v = rr['capabilities'][k]
+            if v:
+                log.info('clangd server capability: %s' % k)
         self._manager.on_server_connected()
         return rr
 

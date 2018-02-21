@@ -144,20 +144,26 @@ class ClangdManager(object):
             try:
                 self._client = LSPClient(clangd_executable, clangd_log_path,
                                          self)
-            except OSError:
-                log.exception('failed to start clangd')
-                vimsupport.EchoMessage('failed to start clangd executable')
-                return
-            rr = self._client.initialize()
-            capabilities = rr['capabilities']
-            if 'completionProvider' in capabilities and 'triggerCharacters' in capabilities['completionProvider']:
-                self._triggerCharacters = set(capabilities['completionProvider']['triggerCharacters'])
+                rr = self._client.initialize()
+                capabilities = rr['capabilities']
+                if 'completionProvider' in capabilities and 'triggerCharacters' in capabilities['completionProvider']:
+                    self._triggerCharacters = set(capabilities['completionProvider']['triggerCharacters'])
+            except:
+                if self._client:
+                    client = self._client
+                    client.CleanUp()
+                    self._client = None
+                if confirmed:
+                    raise
+                else:
+                    log.exception('failed to start backend')
+                    vimsupport.EchoMessage('failed to start backend executable')
 
     def stopServer(self, confirmed=False, in_shutdown=False):
         if in_shutdown:
             self._in_shutdown = True
         if confirmed or vimsupport.PresentYesOrNoDialog(
-                'Should we stop clangd?'):
+                'Should we stop backend?'):
             try:
                 if self._client:
                     client = self._client
@@ -165,22 +171,26 @@ class ClangdManager(object):
                     client.exit()
                     self._client = None
             except OSError:
-                log.exception('failed to stop clangd')
+                if self._client:
+                    client = self._client
+                    client.CleanUp()
+                    self._client = None
+                log.exception('failed to stop backend')
                 return
 
     def restartServer(self):
-        log.info('restart clangd')
+        log.warn('restart backend')
         self.stopServer(confirmed=True)
         self.startServer(confirmed=True)
 
     def on_server_connected(self):
-        log.info('clangd up')
+        log.debug('event: backend is up')
         self._client.onInitialized()
         # wipe all exist documents
         self._documents = {}
 
     def on_server_down(self):
-        log.warn('clangd down unexceptedly')
+        log.debug('event: backend is down unexceptedly')
 
         self.lined_diagnostics = {}
         vimsupport.ClearClangdSyntaxMatches()
@@ -192,7 +202,7 @@ class ClangdManager(object):
                 self.startServer(confirmed=True)
 
     def on_bad_message_received(self, wc, message):
-        log.info('observer: bad message')
+        log.warn('event: bad message')
 
     def OpenFile(self, file_name):
         if not self.isAlive():
@@ -227,7 +237,7 @@ class ClangdManager(object):
         except TimedOutError:
             log.exception('unable to save %s' % file_name)
             return False
-        log.info('file %s saved' % file_name)
+        log.debug('file %s saved' % file_name)
         return True
 
     def SaveCurrentFile(self):
@@ -249,7 +259,7 @@ class ClangdManager(object):
         except TimedOutError:
             log.exception('failed to close file %s' % file_name)
             return False
-        log.info('file %s closed' % file_name)
+        log.debug('file %s closed' % file_name)
         return True
 
     def CloseCurrentFile(self):
@@ -261,7 +271,7 @@ class ClangdManager(object):
     def onDiagnostics(self, uri, diagnostics):
         if uri not in self._documents:
             return
-        log.info('diagnostics for %s is updated' % uri)
+        log.debug('diagnostics for %s is updated' % uri)
         self._documents[uri]['diagnostics'] = diagnostics
 
     def HandleClientRequests(self):
@@ -373,7 +383,7 @@ class ClangdManager(object):
         self._documents[uri] = {}
         self._documents[uri]['version'] = 1
         self._client.didOpenTestDocument(uri, text, file_type)
-        log.info('file %s opened' % file_name)
+        log.debug('file %s opened' % file_name)
 
     def didChangeFile(self, buf):
         file_name = buf.name
@@ -426,8 +436,8 @@ class ClangdManager(object):
             return
         tries = self._GetEmptyCompletions()
 
-        log.info('performed clang codecomplete at %d:%d, result %d items' %
-                 (line, column, len(completions)))
+        log.debug('performed clang codecomplete at %d:%d, result %d items' %
+                (line, column, len(completions)))
 
         for completion in completions:
             if not 'kind' in completion:
@@ -535,9 +545,9 @@ class ClangdManager(object):
         response = self.wc.GetCursorDetail(vimsupport.CurrentBufferFileName(),
                                            line, column)
         if not response:
+            log.warning('unable to get cursor at %d:%d' % (line, column))
             vimsupport.EchoTruncatedText('unable to get cursor at %d:%d' %
                                          (line, column))
-            log.warning('unable to get cursor at %d:%d' % (line, column))
             return
         detail = response.detail
         message = 'Type: %s Kind: %s' % (detail.type, detail.kind)
@@ -611,8 +621,8 @@ class ClangdManager(object):
             # actual format rpc
             textedits = self._client.format(uri)
         except TimedOutError:
-            vimsupport.EchoMessage('clangd refuse to perform code format')
-            log.exception('code format')
+            log.exception('code format timed out')
+            vimsupport.EchoMessage('backend refuses to perform code format')
             return
 
         self._UpdateBufferByTextEdits(buf, textedits)
@@ -635,8 +645,8 @@ class ClangdManager(object):
             textedits = self._client.rangeFormat(uri, start_line - 1, start_column,
                                                  end_line - 1, end_column)
         except TimedOutError:
-            vimsupport.EchoMessage("clangd refuse to perform code format")
             log.exception('code format')
+            vimsupport.EchoMessage("clangd refuse to perform code format")
             return
 
         self._UpdateBufferByTextEdits(buf, textedits)
