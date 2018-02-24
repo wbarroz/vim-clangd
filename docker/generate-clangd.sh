@@ -16,11 +16,19 @@ build_clangd() {
   echo "clangd tarball for $DISTRO is created"
 }
 
-if [ ! -z "$1" ]; then
-  build_clangd $1
+if [ $# -ge 1  ]; then
+  while (( "$#" )); do
+    build_clangd $1
+    shift
+  done
 else
+  echo "No platforms specified, try to build all supported platforms"
   build_clangd debian-8
+  build_clangd debian-9
   build_clangd ubuntu-14.04
   build_clangd ubuntu-16.04
+  build_clangd ubuntu-18.04
   build_clangd fedora-25
+  build_clangd fedora-26
+  build_clangd fedora-27
 fi

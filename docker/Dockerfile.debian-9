@@ -1,0 +1,15 @@
+FROM debian:9
+ENV DEBIAN_FRONTEND noninteractive
+RUN apt-get update -qq && \
+        apt-get install --no-install-recommends python curl \
+        ca-certificates git-core \
+        cmake zlib1g-dev build-essential ninja-build -y && \
+        apt-get clean
+RUN echo 'deb http://apt.llvm.org/stretch/ llvm-toolchain-stretch-5.0 main' > /etc/apt/sources.list.d/llvm.list
+# Fingerprint: 6084 F3CF 814B 57C1 CF12 EFD5 15CF 4D18 AF4F 7421
+# gnupg is required by apt-key add - in next step
+RUN apt-get update -qq && apt-get install --no-install-recommends gnupg -y && apt-get clean
+RUN curl http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
+RUN apt-get update -qq && apt-get install --no-install-recommends clang-5.0 -y && apt-get clean
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-5.0 50
+RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-5.0 50

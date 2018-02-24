@@ -1,0 +1,6 @@
+FROM fedora:27
+RUN dnf install -y python curl \
+        ca-certificates git clang \
+        gcc gcc-c++ make which \
+        cmake zlib-devel ninja-build -y && \
+        dnf clean all
