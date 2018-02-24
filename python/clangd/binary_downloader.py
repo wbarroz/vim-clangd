@@ -16,7 +16,14 @@ try:
 except ImportError:
     from urllib2 import urlopen
 
-from clangd.vimsupport import PresentYesOrNoDialog,EchoMessage
+try:
+    from clangd.vimsupport import PresentYesOrNoDialog,EchoMessage
+except ImportError:
+    def PresentYesOrNoDialog(s):
+        pass
+
+    def EchoMessage(s):
+        log.info(s)
 
 DOWNLOAD_INDEX_URL = 'https://storage.googleapis.com/vim-clangd/REV308822/clangd-download-index.json'
 DOWNLOAD_URL_PREFIX = 'https://storage.googleapis.com/vim-clangd/'

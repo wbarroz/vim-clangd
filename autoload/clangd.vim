@@ -67,21 +67,19 @@ def SetUpLogging():
       return False
     return True
 
-def SetUpManager():
+def SetUpEventHandler():
     try:
-      global manager, handler, FilterFileName, FilterCurrentFile
+      global handler, FilterFileName, FilterCurrentFile
       from clangd.clangd_manager import FilterFileName, FilterCurrentFile
-      from clangd.clangd_manager import ClangdManager
       from clangd.event_dispatcher import EventDispatcher
-      manager = ClangdManager()
-      handler = EventDispatcher(manager)
+      handler = EventDispatcher()
     except Exception as e:
       log.exception('failed to set up python')
       err = e
       return False
     return True
 
-backend_loaded = SetUpLogging() and SetUpManager()
+backend_loaded = SetUpLogging() and SetUpEventHandler()
 if log:
   log.debug('let g:clangd#backend_loaded = %d' % int(backend_loaded))
 vim.command('let g:clangd#backend_loaded = %d' % int(backend_loaded))
@@ -214,9 +212,6 @@ fu! s:VimLeave()
 endf
 
 fu! s:BufferRead()
-  if s:FilterCurrentFile()
-    return
-  endif
   Python handler.OnBufferRead()
 endf
 
@@ -314,10 +309,7 @@ fu! s:FilterFileName(file_name)
 endf
 
 fu! s:ShowDiagnostics()
-  if s:FilterCurrentFile()
-    return
-  endif
-  let diags = s:PyEval('manager.GetDiagnosticsForCurrentFile()')
+  let diags = s:PyEval('handler.GetDiagnosticsForCurrentFile()')
   if !empty(diags)
     call setloclist(0, diags)
 
@@ -328,12 +320,7 @@ fu! s:ShowDiagnostics()
 endf
 
 fu! s:ForceCompile()
-  if s:PyEval('FilterCurrentFile()')
-    return
-  endif
-  Python manager.ReparseCurrentFile()
-  Python manager.GetDiagnosticsForCurrentFile()
-  Python manager.EchoErrorMessageForCurrentLine()
+  Python handler.ForceCompile()
 endf
 
 fu! clangd#CodeCompleteAt(findstart, base)
@@ -341,43 +328,45 @@ fu! clangd#CodeCompleteAt(findstart, base)
     return clangd#OmniCompleteAt(a:findstart, a:base)
   endif
   if a:findstart
-    if s:PyEval('FilterCurrentFile()')
-      return -3
+    let ret = s:PyEval('handler.CodeCompleteAtCurrent()')
+    if empty(ret)
+      return -2
     endif
     if !s:cursor_moved
       return -2
     endif
-    if !s:PyEval('manager.isAlive()')
-      return -2
-    endif
-    let l:column = s:PyEval('manager.CodeCompleteAtCurrent()')
+    let l:column = ret
     return l:column - 1
   endif
 
-  if s:PyEval('FilterCurrentFile()')
+  " return completions
+  let ret = s:PyEval('handler.GetCompletions()')
+  if empty(ret)
     return []
   endif
-  " return completions
-  let l:completions = s:PyEval('manager.GetCompletions()')
   " Report a result.
   if complete_check()
     return []
   endif
+  let l:completions = ret
   return l:completions
 endf
 
 fu! clangd#OmniCompleteAt(findstart, base)
   if a:findstart
-    if !s:PyEval('manager.isAlive()')
+    let ret = s:PyEval('handler.CodeCompleteAtCurrent()')
+    if empty(ret)
       return -2
     endif
+    let l:column = ret
     let s:omnifunc_mode = 1
-    let l:column = s:PyEval('manager.CodeCompleteAtCurrent()')
     return l:column
   endif
 
   " return completions
-  let l:completions = s:PyEval('manager.GetCompletions()')
+  let l:completions = s:PyEval('handler.GetCompletions()')
+  if empty(l:completions)
+    return []
   return l:completions
 endf
 
@@ -408,48 +397,32 @@ fu! s:SetCompletionCallback()
 endf
 
 fu! s:GotoDefinition()
-  if s:PyEval('FilterCurrentFile()')
-    echom 'unsupported file type'
-    return
-  endif
-
-  Python manager.GotoDefinition()
+  Python handler.GotoDefinition()
 endf
 
 fu! s:ShowDetailedDiagnostic()
-  if s:PyEval('FilterCurrentFile()')
-    echom 'unsupported file type'
-    return
-  endif
-
-  Python manager.EchoDetailedErrorMessage()
+  Python handler.EchoDetailedErrorMessage()
 endf
 
 fu! s:ShowCursorDetail()
-  if s:PyEval('FilterCurrentFile()')
-    echom 'unsupported file type'
-    return
-  endif
-
-  Python manager.ShowCursorDetail()
+  Python handler.ShowCursorDetail()
 endf
 
 fu! s:StartServer()
-  Python manager.startServer(confirmed = True)
+  Python handler.StartServer()
 endf
 
 fu! s:StopServer()
-  Python manager.stopServer(confirmed = True)
+  Python handler.StopServer()
 endf
 
 fu! s:RestartServer()
-  Python manager.stopServer(confirmed = True)
-  Python manager.startServer(confirmed = True)
+  Python handler.RestartServer()
 endf
 
 fu! s:Format()
   " Determine range or format current buffer
-  Python manager.format()
+  Python handler.format()
 endf
 
 fu! s:DownloadBinary()
@@ -465,10 +438,7 @@ fu! s:PyEval(line)
 endf
 
 fu! ClangdStatuslineFlag()
-  if s:PyEval('FilterCurrentFile()')
-    return ''
-  endif
-  return s:PyEval('manager.ErrorStatusForCurrentLine()')
+  return s:PyEval('handler.ErrorStatusForCurrentLine()')
 endf
 
 " Setup Commands

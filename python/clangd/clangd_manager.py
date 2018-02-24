@@ -109,9 +109,7 @@ class ClangdManager(object):
         self._in_shutdown = False
         self._documents = {}
         self._triggerCharacters = set(DEFAULT_TRIGGER_STYLE)
-        autostart = GetBoolValue('g:clangd#autostart')
-        if autostart:
-            self.startServer(confirmed=True)
+        self._computed_completions_words = []
         self._ClearLastCompletions()
 
     def _ClearLastCompletions(self):
