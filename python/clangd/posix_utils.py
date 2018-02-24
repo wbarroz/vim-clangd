@@ -2,7 +2,7 @@ from array import array
 import fcntl
 from fcntl import ioctl
 from sys import platform as sys_platform
-from errno import EINTR
+from errno import EINTR, EAGAIN
 from clangd.vimsupport import PY2
 try:
     from termios import FIONREAD
@@ -35,16 +35,20 @@ def Pipe():
 
 def WriteUtf8(fd, data):
     msg = data.encode('utf-8')
+    written = 0
     while len(msg):
         try:
-            written = write(fd, msg)
-            if written == 0:
+            ret = write(fd, msg)
+            if ret == 0:
                 raise OSError('broken pipe')
-            msg = msg[written:]
+            written += ret
+            msg = msg[ret:]
         except OSError as e:
+            if e.errno == EAGAIN:
+                break
             if e.errno != EINTR:
                 raise
-    return msg
+    return written
 
 
 def ReadUtf8(fd, length):
@@ -57,6 +61,8 @@ def ReadUtf8(fd, length):
             length -= len(buf)
             msg += buf
         except OSError as e:
+            if e.errno == EAGAIN:
+                break
             if e.errno != EINTR:
                 raise
     return msg.decode('utf-8')

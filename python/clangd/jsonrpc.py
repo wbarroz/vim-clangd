@@ -37,6 +37,8 @@ IDLE_INTERVAL_MS = 25
 class TimedOutError(OSError):
     pass
 
+def isNumber(c):
+    return ord('0') <= ord(c) and ord(c) <= ord('9')
 
 class JsonRPCClientThread(Thread):
     def __init__(self, input_fd, output_fd, read_queue, write_queue):
@@ -46,6 +48,8 @@ class JsonRPCClientThread(Thread):
         self._output_fd = output_fd
         self._read_queue = read_queue
         self._write_queue = write_queue
+        self._writebuf = u''
+        self._readbuf = u''
         if sys_platform == 'win32':
             SetNonBlock(input_fd)
             SetNonBlock(output_fd)
@@ -55,32 +59,54 @@ class JsonRPCClientThread(Thread):
         log.warn('io thread shutdown')
         self._poller.shutdown()
 
+    def _FlushSendBuffer(self):
+        while self._writebuf:
+            written = WriteUtf8(self._input_fd, self._writebuf)
+            if not written:
+                break
+            self._writebuf = self._writebuf[written:]
+            log.debug('written %d bytes remains %d bytes' % (written, len(self._writebuf)))
+
+    def _FetchRecvBuffer(self, buffer_len = 256):
+        while buffer_len:
+            chunk = ReadUtf8(self._output_fd, buffer_len)
+            if not chunk:
+                break
+            log.debug('read %d bytes with buffer %d bytes' % (len(chunk), buffer_len))
+            buffer_len -= len(chunk)
+            self._readbuf += chunk
+
     def _SendMsg(self, r):
         request = json.dumps(r, separators=(',', ':'), sort_keys=True)
-        WriteUtf8(self._input_fd,
-                   u'Content-Length: %d\r\n\r\n' % len(request))
-        WriteUtf8(self._input_fd, request)
-
-    def _RecvMsgHeader(self):
-        ReadUtf8(self._output_fd, len('Content-Length: '))
-        msg = u''
-        msg += ReadUtf8(self._output_fd, 4)
-        while True:
-            if msg.endswith('\r\n\r\n'):
-                break
-            if len(msg) >= 23:  # sys.maxint + 4
-                raise OSError('bad protocol')
-            msg += ReadUtf8(self._output_fd, 1)
-
-        msg = msg[:-4]
-        length = int(msg)
-        return length
+        self._writebuf += u'Content-Length: %d\r\n\r\n' % len(request)
+        self._writebuf += request
 
     def _RecvMsg(self):
-        msg_length = self._RecvMsgHeader()
-        msg = ReadUtf8(self._output_fd, msg_length)
-
-        rr = json.loads(msg)
+        PREFIX = 'Content-Length: '
+        if len(self._readbuf) < len(PREFIX):
+            return None
+        if not self._readbuf.startswith(PREFIX):
+            raise OSError('bad protocol')
+        i = len(PREFIX)
+        while i < len(self._readbuf):
+            if i - len(PREFIX) >= 23:  # sys.maxint + 4
+                raise OSError('bad protocol')
+            if not isNumber(self._readbuf[i]):
+                break
+            i += 1
+        if len(self._readbuf) < i + 4:
+            return None
+        if self._readbuf[i:i + 4] != u'\r\n\r\n':
+            raise OSError('bad protocol')
+        length = int(self._readbuf[len(PREFIX):i])
+        if len(self._readbuf) < i + 4 + length:
+            return None
+        msg = self._readbuf[i + 4:i + 4 + length]
+        try:
+            rr = json.loads(msg)
+        except Exception:
+            raise OSError('bad protocol')
+        self._readbuf = self._readbuf[i + 4 + length:]
         return rr
 
     def _OnWentWrong(self):
@@ -90,52 +116,56 @@ class JsonRPCClientThread(Thread):
     def run(self):
         log.warn('io thread starts')
         try:
-            self._Run()
+            self._RunEventLoop()
         except:
             log.exception('fatal error, io thread')
         self.shutdown()
 
-    def _Run(self):
+    def _RunEventLoop(self):
         long_idle = 0
         while not self._is_stop:
+            rlist, _ = self._poller.poll(IDLE_INTERVAL_MS * long_idle)
+
+            if rlist:
+                buffer_len = EstimateUnreadBytes(self._output_fd)
+                # ticky to detect clangd's failure
+                if buffer_len == 0:
+                    self._OnWentWrong()
+                    break
+
+            if rlist or len(self._readbuf):
+                long_idle = 0
+
+                if rlist:
+                    buffer_len = EstimateUnreadBytes(self._output_fd)
+                    self._FetchRecvBuffer(buffer_len)
+
+                try:
+                    rr = self._RecvMsg()
+                except OSError as e:
+                    self._OnWentWrong()
+                    break
+
+                if rr:
+                    self._read_queue.put(rr)
+
             while True:
                 try:
                     r = self._write_queue.get_nowait()
                 except queue.Empty:
                     break
-
                 # receive shutdown sentinel
                 if r == None:
                     self._is_stop = True
                     break
-
                 try:
                     self._SendMsg(r)
                     long_idle = 0
                 except OSError as e:
                     self._OnWentWrong()
                     break
-            if self._is_stop:
-                break
+            self._FlushSendBuffer()
 
-            rlist, _ = self._poller.poll(IDLE_INTERVAL_MS * long_idle)
-
-            # ticky to detect clangd's failure
-            if rlist and EstimateUnreadBytes(self._output_fd) == 0:
-                self._OnWentWrong()
-                break
-
-            if rlist:
-                long_idle = 0
-
-            if rlist and EstimateUnreadBytes(
-                    self._output_fd) > len('Content-Length: '):
-                try:
-                    rr = self._RecvMsg()
-                except OSError as e:
-                    self._OnWentWrong()
-                    break
-                self._read_queue.put(rr)
             if long_idle < 100:
                 long_idle += 1
 
@@ -197,7 +227,7 @@ class JsonRPCClient(object):
         except OSError:
             self._observer.onServerDown()
             raise
-        log.debug('send notifications: %s' % r)
+        log.info('send notifications: %s' % method)
 
     def handleRecv(self):
         while True:
@@ -236,13 +266,13 @@ class JsonRPCClient(object):
         return rr
 
     def OnNotification(self, request):
-        log.debug('recv notification: %s' % request)
+        log.info('recv notification: %s' % request['method'])
         self._observer.onNotification(request['method'], request['params'])
 
     def OnRequest(self, request):
-        log.debug('recv request: %s' % request)
+        log.info('recv request: %s' % request['method'])
         self._observer.onRequest(request['method'], request['params'])
 
     def OnResponse(self, request, response):
-        log.debug('recv response: %s' % response)
+        log.debug('recv response from: %s' % request['method'])
         self._observer.onResponse(request, response['result'])

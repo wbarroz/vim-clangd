@@ -14,7 +14,7 @@ from struct import unpack, pack
 
 import os
 import socket
-from errno import EINTR
+from errno import EINTR, EAGAIN
 
 from msvcrt import open_osfhandle
 
@@ -335,16 +335,20 @@ def EstimateUnreadBytes(winsocket):
 def WriteUtf8(winsocket, data):
     msg = data.encode('utf-8')
     fd = winsocket.fileno()
+    written = 0
     while len(msg):
         try:
-            written = os.write(fd, msg)
-            if written == 0:
+            ret = os.write(fd, msg)
+            if ret == 0:
                 raise OSError('broken pipe')
-            msg = msg[written:]
+            written += ret
+            msg = msg[ret:]
         except OSError as e:
+            if e.errno == EAGAIN:
+                break
             if e.errno != EINTR:
                 raise
-    return msg
+    return written
 
 
 def ReadUtf8(winsocket, length):
@@ -358,6 +362,8 @@ def ReadUtf8(winsocket, length):
             length -= len(buf)
             msg += buf
         except OSError as e:
+            if e.errno == EAGAIN:
+                break
             if e.errno != EINTR:
                 raise
     return msg.decode('utf-8')
