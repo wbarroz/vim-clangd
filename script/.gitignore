@@ -4,3 +4,4 @@ build-llvm
 clangd
 bin
 lib
+clangd-download-index.json
