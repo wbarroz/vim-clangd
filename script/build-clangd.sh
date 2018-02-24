@@ -2,6 +2,8 @@
 set -e
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
+source clangd_commits
+
 die() {
     echo $1
     exit -1
@@ -11,26 +13,29 @@ fetch_src() {
     if [ ! -d llvm-src ]; then
         git clone --depth=1 https://github.com/llvm-mirror/llvm llvm-src
     else
-        echo 'Use existing llvm-src, rebasing to remote HEAD'
+        echo "Use existing llvm-src, rebasing to $LLVM_COMMIT"
         pushd llvm-src
-        git pull --rebase
+        git fetch
+        git reset --hard $LLVM_COMMIT
         popd
     fi
     if [ ! -d llvm-src/tools/clang ]; then
         git clone --depth=1 https://github.com/llvm-mirror/clang llvm-src/tools/clang
     else
-        echo 'Use existing llvm-src/tools/clang, rebasing to remote HEAD'
+        echo "Use existing llvm-src/tools/clang, rebasing to $CFE_COMMIT"
         pushd llvm-src/tools/clang
-        git pull --rebase
+        git fetch
+        git reset --hard $CFE_COMMIT
         popd
     fi
 
     if [ ! -d llvm-src/tools/clang/tools/extra ]; then
         git clone --depth=1 https://github.com/llvm-mirror/clang-tools-extra llvm-src/tools/clang/tools/extra
     else
-        echo 'Use existing llvm-src/tools/clang/tools/extra, rebasing to remote HEAD'
+        echo "Use existing llvm-src/tools/clang/tools/extra, rebasing to $CFE_EXTRA_COMMIT"
         pushd llvm-src/tools/clang/tools/extra
-        git pull --rebase
+        git fetch
+        git reset --hard $CFE_EXTRA_COMMIT
         popd
     fi
 }
@@ -99,9 +104,10 @@ build_clangd() {
 }
 
 post_build() {
-    mkdir -p bin lib/clang/6.0.0
+    clang_header_version=$(ls build-llvm/lib/clang)
+    mkdir -p bin lib/clang/$clang_header_version
     cp -f {build-llvm/,}bin/clangd
-    cp -rf build-llvm/lib/clang/6.0.0/include lib/clang/6.0.0/
+    cp -rf build-llvm/lib/clang/$clang_header_version/include lib/clang/$clang_header_version/
     echo "clangd is built at $PWD/bin/clangd"
 }
 
