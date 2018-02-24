@@ -1,7 +1,7 @@
 """ poller for cross-platform """
 
 from select import select
-from clangd.vimsupport import PY2
+from clangd_support.python_utils import PY2
 
 class Poller(object):
     def __init__(self, rfds, wfds):

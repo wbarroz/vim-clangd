@@ -9,9 +9,9 @@ from clangd.jsonrpc import JsonRPCClient, TimedOutError
 
 # platform-specific stuff
 if sys_platform == 'win32':
-    from clangd.win32_utils import Win32SocketPair
+    from clangd_support.win32_utils import Win32SocketPair
 else:
-    from clangd.posix_utils import SetCloseOnExec, Pipe
+    from clangd_support.posix_utils import SetCloseOnExec, Pipe
 
 Initialize_REQUEST = 'initialize'
 Shutdown_REQUEST = 'shutdown'
@@ -154,7 +154,6 @@ class LSPClient(object):
         if not 'capabilities' in rr:
             rr['capabilities'] = {}
         log.debug('clangd connected with backend server')
-        log.debug('clangd capabilities: %s' % rr['capabilities'])
         for k in rr['capabilities']:
             v = rr['capabilities'][k]
             if v:

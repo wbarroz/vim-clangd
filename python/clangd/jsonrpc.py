@@ -25,14 +25,15 @@ except ImportError:
 
 # platform specific
 if sys_platform == 'win32':
-    from clangd.poller import Win32Poller as Poller
-    from clangd.win32_utils import SetNonBlock, EstimateUnreadBytes, WriteUtf8, ReadUtf8
+    from clangd_support.poller import Win32Poller as Poller
+    from clangd_support.win32_utils import SetNonBlock, EstimateUnreadBytes, WriteUtf8, ReadUtf8
 else:
-    from clangd.poller import PosixPoller as Poller
-    from clangd.posix_utils import EstimateUnreadBytes, WriteUtf8, ReadUtf8
+    from clangd_support.poller import PosixPoller as Poller
+    from clangd_support.posix_utils import SetNonBlock, EstimateUnreadBytes, WriteUtf8, ReadUtf8
 
 DEFAULT_TIMEOUT_MS = 1000
 IDLE_INTERVAL_MS = 25
+MAX_IDLE_TIMES = 10
 
 class TimedOutError(OSError):
     pass
@@ -50,9 +51,8 @@ class JsonRPCClientThread(Thread):
         self._write_queue = write_queue
         self._writebuf = u''
         self._readbuf = u''
-        if sys_platform == 'win32':
-            SetNonBlock(input_fd)
-            SetNonBlock(output_fd)
+        SetNonBlock(input_fd)
+        SetNonBlock(output_fd)
         self._poller = Poller([self._output_fd], [])
 
     def shutdown(self):
@@ -166,7 +166,7 @@ class JsonRPCClientThread(Thread):
                     break
             self._FlushSendBuffer()
 
-            if long_idle < 100:
+            if long_idle < MAX_IDLE_TIMES:
                 long_idle += 1
 
 class JsonRPCClient(object):

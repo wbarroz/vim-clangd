@@ -1,9 +1,10 @@
 from array import array
 import fcntl
-from fcntl import ioctl
+import os
 from sys import platform as sys_platform
 from errno import EINTR, EAGAIN
-from clangd.vimsupport import PY2
+from clangd_support.python_utils import PY_VERSION, PY2
+
 try:
     from termios import FIONREAD
 except ImportError:
@@ -21,12 +22,20 @@ from os import pipe, read, write
 
 def EstimateUnreadBytes(fd):
     buf = array('i', [0])
-    ioctl(fd, FIONREAD, buf, 1)
+    fcntl.ioctl(fd, FIONREAD, buf, 1)
     return buf[0]
 
 
 def SetCloseOnExec(fd):
-    fcntl.fcntl(fd, fcntl.F_SETFD, fcntl.FD_CLOEXEC)
+    flags = fcntl.fcntl(fd, fcntl.F_GETFD)
+    flags |= fcntl.FD_CLOEXEC
+    fcntl.fcntl(fd, fcntl.F_SETFD, flags)
+
+
+def SetNonBlock(fd):
+    flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+    flags |= os.O_NONBLOCK
+    fcntl.fcntl(fd, fcntl.F_SETFL, flags)
 
 
 def Pipe():

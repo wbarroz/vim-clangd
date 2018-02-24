@@ -1,7 +1,8 @@
 from time import time
 from clangd import glog as log
-from clangd.vimsupport import GetBoolValue, PY_VERSION, PY2, EchoText, CurrentFileTypes
+from clangd.vimsupport import GetBoolValue, EchoText, CurrentFileTypes
 from clangd.clangd_manager import FilterCurrentFile
+from clangd_support.python_utils import PY_VERSION, PY2
 
 
 class EmulateTimer(object):

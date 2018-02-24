@@ -1,13 +1,7 @@
 import os
 import vim
 from clangd import glog as log
-
-from sys import version_info
-PY_VERSION = version_info[0]
-PY2 = PY_VERSION  == 2
-
-def PyVersion():
-    return PY_VERSION
+from clangd_support.python_utils import PY_VERSION, PY2
 
 # Given an object, returns a str object that's utf-8 encoded.
 def ToUtf8IfNeeded(value):
