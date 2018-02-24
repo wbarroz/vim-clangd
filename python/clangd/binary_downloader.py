@@ -25,7 +25,8 @@ except ImportError:
     def EchoMessage(s):
         log.info(s)
 
-DOWNLOAD_INDEX_URL = 'https://storage.googleapis.com/vim-clangd/REV308822/clangd-download-index.json'
+LLVM_COMMIT = "796005d4a195f37222d7f63dc38b7b8ffe8cef6d"
+DOWNLOAD_INDEX_URL_FORMAT = 'https://storage.googleapis.com/vim-clangd/%s/clangd-download-index.json'
 DOWNLOAD_URL_PREFIX = 'https://storage.googleapis.com/vim-clangd/'
 
 
@@ -51,7 +52,8 @@ class BinaryDownloader(object):
         pass
 
     def _LoadDownloadInfo(self):
-        response = urlopen(DOWNLOAD_INDEX_URL)
+        url = DOWNLOAD_INDEX_URL_FORMAT % LLVM_COMMIT
+        response = urlopen(url)
         html = response.read()
         data = json.loads(html.decode('utf-8'))
         return data

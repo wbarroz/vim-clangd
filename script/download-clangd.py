@@ -9,3 +9,4 @@ if __name__ == '__main__':
     script_path = os.path.abspath(os.path.join(repo_path, 'script'))
     downloader = BinaryDownloader()
     downloader.downloadBinary(script_path)
+    printf("download finished")
